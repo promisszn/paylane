@@ -119,7 +119,7 @@ export interface AppStatus {
   paypalEnv: string
   aiProvider: string
   aiModel: string
-  /** DEMO_MODE=true on sandbox: shows "Make overdue" so the reminder flow can be recorded right away. */
+  /** DEMO_MODE=true on sandbox: shows a "Backdate" button so the reminder flow can be recorded right away. */
   demoMode: boolean
   freelancer: { name: string; business: string; currency: string }
 }

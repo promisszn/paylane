@@ -49,7 +49,7 @@ function actionsFor(r: ReceivableRow): Array<[string, string]> {
       return [['send', 'Send'], ['cancel', 'Cancel']]
     case 'sent':
       return demo.value
-        ? [['remind', 'Remind'], ['pay', 'Pay link'], ['overdue', 'Make overdue']]
+        ? [['remind', 'Remind'], ['pay', 'Pay link'], ['overdue', 'Backdate']]
         : [['remind', 'Remind'], ['pay', 'Pay link']]
     default:
       return []
@@ -57,13 +57,15 @@ function actionsFor(r: ReceivableRow): Array<[string, string]> {
 }
 
 const columnDefs: ColDef<ReceivableRow>[] = [
-  { field: 'client', headerName: 'Client', minWidth: 120, flex: 1 },
-  { field: 'project', headerName: 'Job', minWidth: 140, flex: 1.2 },
-  { field: 'milestone', headerName: 'Milestone', minWidth: 150, flex: 1.2 },
+  // Client names are short, job names are the longest text, so Job gets the most room.
+  // Fixed columns are sized to their content so the whole grid fits 1160px even in demo mode.
+  { field: 'client', headerName: 'Client', minWidth: 80, flex: 0.8, tooltipField: 'client' },
+  { field: 'project', headerName: 'Job', minWidth: 170, flex: 1.6, tooltipField: 'project' },
+  { field: 'milestone', headerName: 'Milestone', minWidth: 128, flex: 1.2, tooltipField: 'milestone' },
   {
     field: 'amount',
     headerName: 'Amount',
-    width: 130,
+    width: 115,
     type: 'rightAligned',
     cellClass: 'money',
     valueFormatter: (p) => (p.data ? formatMoney(p.value, p.data.currency) : ''),
@@ -71,7 +73,7 @@ const columnDefs: ColDef<ReceivableRow>[] = [
   {
     colId: 'status',
     headerName: 'Status',
-    width: 150,
+    width: 140,
     // The label is the cell value, so the grid redraws when only daysOverdue changes (e.g. "2d" -> "10d overdue").
     valueGetter: (p) => (p.data ? statusLabel(p.data).text : ''),
     cellRenderer: (p: { data: ReceivableRow }) => {
@@ -80,11 +82,11 @@ const columnDefs: ColDef<ReceivableRow>[] = [
     },
     comparator: (_a, _b, na, nb) => (na.data?.daysOverdue ?? 0) - (nb.data?.daysOverdue ?? 0),
   },
-  { field: 'invoiceNumber', headerName: 'Invoice', width: 95, valueFormatter: (p) => p.value ?? '' },
+  { field: 'invoiceNumber', headerName: 'Invoice', width: 85, valueFormatter: (p) => p.value ?? '' },
   {
     field: 'dueDate',
     headerName: 'Due',
-    width: 100,
+    width: 85,
     valueFormatter: (p) => (p.value ? new Date(`${p.value}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''),
   },
   { field: 'reminders', headerName: 'Nudges', width: 85, type: 'rightAligned', valueFormatter: (p) => (p.value ? String(p.value) : '') },
@@ -92,12 +94,15 @@ const columnDefs: ColDef<ReceivableRow>[] = [
     colId: 'actions',
     headerName: '',
     // Room for the extra demo button. Status is loaded before this client-only grid mounts.
-    width: demo.value ? 290 : 180,
+    width: demo.value ? 268 : 180,
     pinned: 'right',
     sortable: false,
     cellRenderer: (p: { data: ReceivableRow }) =>
       actionsFor(p.data)
-        .map(([key, label]) => `<button type="button" class="grid-action" data-action="${key}">${label}</button>`)
+        .map(
+          ([key, label]) =>
+            `<button type="button" class="grid-action" data-action="${key}"${key === 'overdue' ? ' title="Demo mode: make this invoice more overdue"' : ''}>${label}</button>`,
+        )
         .join(''),
   },
 ]
@@ -124,6 +129,7 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
     :default-col-def="{ sortable: true, resizable: true, suppressMovable: true }"
     :get-row-id="(p: { data: ReceivableRow }) => p.data.milestoneId"
     :dom-layout="'autoHeight'"
+    :tooltip-show-mode="'whenTruncated'"
     :overlay-no-rows-template="'<span>Approved jobs show up here, one row per payment.</span>'"
     @cell-clicked="onCellClicked"
   />

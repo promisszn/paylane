@@ -127,7 +127,7 @@ Open [http://localhost:3000](http://localhost:3000). If a key is missing, the pa
 Payment reminders only matter once an invoice is late. To show them right away, set `DEMO_MODE=true` in `.env` (it only works with `PAYPAL_ENV=sandbox`) and restart.
 
 1. Send an invoice, and don't pay it.
-2. In the ledger, click **Make overdue** on that row. Each click moves it further: 2 days, then 10, then 20.
+2. In the ledger, click **Backdate** on that row. Each click moves it further: 2 days, then 10, then 20.
 3. Click **Remind**. The agent's reminder gets firmer as the invoice gets later: a friendly nudge at 2 days, a clear restatement of the amount at 10, and a calm request for a payment date at 20.
 
 Demo mode only changes Paylane's local copy of the due date. PayPal keeps the real one, and every change is written to the activity log.
