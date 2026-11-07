@@ -10,7 +10,8 @@ import type { ReceivableRow } from '~/types'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
-const { data, reviewInvoice, reviewReminder, cancelMilestone } = useDashboard()
+const { data, status, reviewInvoice, reviewReminder, cancelMilestone, makeOverdue } = useDashboard()
+const demo = computed(() => Boolean(status.value?.demoMode))
 
 const theme = themeQuartz.withParams({
   fontFamily: 'Schibsted Grotesk, sans-serif',
@@ -47,7 +48,9 @@ function actionsFor(r: ReceivableRow): Array<[string, string]> {
     case 'draft':
       return [['send', 'Send'], ['cancel', 'Cancel']]
     case 'sent':
-      return [['remind', 'Remind'], ['pay', 'Pay link']]
+      return demo.value
+        ? [['remind', 'Remind'], ['pay', 'Pay link'], ['overdue', 'Make overdue']]
+        : [['remind', 'Remind'], ['pay', 'Pay link']]
     default:
       return []
   }
@@ -66,9 +69,11 @@ const columnDefs: ColDef<ReceivableRow>[] = [
     valueFormatter: (p) => (p.data ? formatMoney(p.value, p.data.currency) : ''),
   },
   {
-    field: 'status',
+    colId: 'status',
     headerName: 'Status',
     width: 150,
+    // The label is the cell value, so the grid redraws when only daysOverdue changes (e.g. "2d" -> "10d overdue").
+    valueGetter: (p) => (p.data ? statusLabel(p.data).text : ''),
     cellRenderer: (p: { data: ReceivableRow }) => {
       const s = statusLabel(p.data)
       return `<span class="stamp stamp--${s.cls}">${s.text}</span>`
@@ -86,7 +91,8 @@ const columnDefs: ColDef<ReceivableRow>[] = [
   {
     colId: 'actions',
     headerName: '',
-    width: 180,
+    // Room for the extra demo button. Status is loaded before this client-only grid mounts.
+    width: demo.value ? 290 : 180,
     pinned: 'right',
     sortable: false,
     cellRenderer: (p: { data: ReceivableRow }) =>
@@ -104,6 +110,7 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
   else if (action === 'done') reviewInvoice(r.projectId, r.milestoneId, true)
   else if (action === 'remind') reviewReminder(r.projectId, r.milestoneId)
   else if (action === 'cancel') cancelMilestone(r.projectId, r.milestoneId)
+  else if (action === 'overdue') makeOverdue(r.projectId, r.milestoneId, r.daysOverdue)
   else if (action === 'pay' && r.payerUrl) window.open(r.payerUrl, '_blank', 'noopener')
 }
 </script>
@@ -154,6 +161,11 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
     border-color: var(--carbon);
     color: var(--carbon);
   }
+}
+/* Demo-only control: dashed so it never reads as a real money action. */
+.grid-action[data-action='overdue'] {
+  border-style: dashed;
+  color: var(--ink-soft);
 }
 .grid-action[data-action='cancel'] {
   color: var(--ink-faint);

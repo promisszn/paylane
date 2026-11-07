@@ -163,6 +163,20 @@ export function useDashboard() {
     }
   }
 
+  /**
+   * Demo mode: push a sent invoice further overdue, one reminder tone at a time
+   * (2 days = friendly, 10 = clear, 20 = firm). Only our local copy changes.
+   */
+  async function makeOverdue(projectId: string, milestoneId: string, currentDaysOverdue: number) {
+    const days = currentDaysOverdue < 2 ? 2 : currentDaysOverdue < 10 ? 10 : currentDaysOverdue < 20 ? 20 : currentDaysOverdue + 10
+    const res = await run('demo', () =>
+      $fetch<{ milestone: { invoiceNumber?: string } }>('/api/demo/overdue', { method: 'POST', body: { projectId, milestoneId, days } }),
+    )
+    if (!res) return
+    await refresh()
+    notify(`Demo: ${res.milestone.invoiceNumber ?? 'Invoice'} is now ${days} days overdue.`)
+  }
+
   async function syncPayPal() {
     const res = await run('sync', () => $fetch<{ checked: number; newlyPaid: string[] }>('/api/sync', { method: 'POST' }))
     if (!res) return
@@ -186,6 +200,7 @@ export function useDashboard() {
     reviewReminder,
     sendPending,
     cancelMilestone,
+    makeOverdue,
     syncPayPal,
     notify,
   }

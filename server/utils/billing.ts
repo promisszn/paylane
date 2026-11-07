@@ -12,7 +12,8 @@ const DAY = 86_400_000
 /** Copy the PayPal-side truth onto our milestone. Returns true if it just became paid. */
 export function applyInvoiceState(milestone: Milestone, invoice: PayPalInvoice): boolean {
   milestone.invoiceNumber = invoice.detail.invoice_number
-  milestone.dueDate = invoice.detail.payment_term?.due_date ?? milestone.dueDate
+  // A demo-backdated invoice keeps its local due date; PayPal still has the real one.
+  if (!milestone.demoBackdated) milestone.dueDate = invoice.detail.payment_term?.due_date ?? milestone.dueDate
   milestone.payerUrl = invoice.detail.metadata?.recipient_view_url ?? milestone.payerUrl
 
   const wasPaid = milestone.status === 'paid'
@@ -56,6 +57,26 @@ export async function approveAndSend(project: Project, milestone: Milestone, sub
   milestone.draftSubject = subject
   milestone.draftNote = note
   await logActivity('you', `Approved and sent invoice ${milestone.invoiceNumber} (${fmt(milestone.amount, project.currency)}) to ${project.client.name}.`, project.id)
+}
+
+/** Demo helpers only run on sandbox with DEMO_MODE=true, never against live PayPal. */
+export function demoModeOn() {
+  const { demoMode, paypal } = useRuntimeConfig()
+  return Boolean(demoMode) && paypal.env === 'sandbox'
+}
+
+/**
+ * Demo mode: move a sent invoice's due date back so it is `days` overdue right now.
+ * Only our local copy changes. PayPal keeps the real due date, and sync leaves ours alone.
+ */
+export function backdateMilestone(m: Milestone, days: number, now = Date.now()) {
+  const todayStart = Math.floor(now / DAY) * DAY
+  // daysOverdue() counts from the end of the due day, so the due day is days + 1 back.
+  const dueStart = todayStart - (days + 1) * DAY
+  m.dueDate = new Date(dueStart).toISOString().slice(0, 10)
+  // Keep "sent" before "due" so the timeline and the reminder-quiet-period rule still make sense.
+  m.sentAt = new Date(dueStart - m.dueDays * DAY).toISOString()
+  m.demoBackdated = true
 }
 
 export function daysOverdue(m: Milestone, now = Date.now()) {

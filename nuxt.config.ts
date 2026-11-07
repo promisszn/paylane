@@ -27,6 +27,8 @@ export default defineNuxtConfig({
 
   // Everything here can be overridden with NUXT_* env vars at runtime.
   runtimeConfig: {
+    // Demo helpers for recording the video. Only honoured when PAYPAL_ENV is sandbox.
+    demoMode: process.env.DEMO_MODE === 'true',
     paypal: {
       clientId: process.env.PAYPAL_CLIENT_ID ?? '',
       clientSecret: process.env.PAYPAL_CLIENT_SECRET ?? '',

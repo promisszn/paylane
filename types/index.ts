@@ -42,6 +42,8 @@ export interface Milestone {
   dueDate?: string
   paidAt?: string
   reminders: Reminder[]
+  /** Demo mode moved the due date into the past. Sync then keeps our date instead of PayPal's. */
+  demoBackdated?: boolean
 }
 
 export interface Client {
@@ -117,5 +119,7 @@ export interface AppStatus {
   paypalEnv: string
   aiProvider: string
   aiModel: string
+  /** DEMO_MODE=true on sandbox: shows "Make overdue" so the reminder flow can be recorded right away. */
+  demoMode: boolean
   freelancer: { name: string; business: string; currency: string }
 }

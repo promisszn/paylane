@@ -10,6 +10,7 @@ export default defineEventHandler((): AppStatus => {
     paypalEnv: paypal.env,
     aiProvider: ai.provider,
     aiModel: ai.model,
+    demoMode: demoModeOn(),
     freelancer: { name: freelancer.name, business: freelancer.business, currency: freelancer.currency },
   }
 })

@@ -172,14 +172,16 @@ export async function draftReminder(project: Project, milestone: Milestone, days
           : daysUntilDue === 0
             ? 'due today'
             : `past its due date of ${dueLabel}, within the grace period`
+  // The tone is a rule, not a model judgement, so it is predictable and matches the docs.
+  const tone = reminderTone(daysOverdue, previous)
   return structured(
     emailSchema,
     [
       `You write payment reminders for ${freelancer.name}, a freelancer who wants to get paid AND keep the client.`,
-      'Match the tone to the situation:',
-      '- not yet due or 0-3 days late, no prior reminders: light, friendly nudge',
-      '- 4-14 days late or 1 prior reminder: polite but clear, restate amount and invoice number',
-      '- 15+ days late or 2+ prior reminders: firm and calm, ask for a payment date, mention pausing further work',
+      'Write in the tone given in the "tone" field:',
+      '- friendly: light nudge. The subject may say "friendly reminder".',
+      '- clear: polite but direct. Restate the amount and invoice number. The subject names the invoice number and says it is overdue; do not call it friendly.',
+      '- firm: calm and firm. Ask for a specific payment date and say further work is paused until it is settled. The subject says the payment is overdue; do not call it friendly or gentle.',
       'Use the "dueState" field as the only truth about timing. Never say the invoice is due today or late unless dueState says so; if it is not due yet, say it is a gentle heads-up with the due date.',
       'Never threaten, never guilt-trip, no ALL CAPS. Plain text. Sign off with the freelancer\'s first name.',
     ].join('\n'),
@@ -192,8 +194,16 @@ export async function draftReminder(project: Project, milestone: Milestone, days
       today,
       dueDate: dueLabel,
       dueState,
+      tone,
       daysOverdue,
       previousReminders: previous,
     }),
   )
+}
+
+/** friendly up to 3 days late, clear from 4 days or after 1 reminder, firm from 15 days or after 2. */
+export function reminderTone(daysOverdue: number, previousReminders: number): 'friendly' | 'clear' | 'firm' {
+  if (daysOverdue >= 15 || previousReminders >= 2) return 'firm'
+  if (daysOverdue >= 4 || previousReminders >= 1) return 'clear'
+  return 'friendly'
 }
