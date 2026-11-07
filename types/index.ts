@@ -121,5 +121,7 @@ export interface AppStatus {
   aiModel: string
   /** DEMO_MODE=true on sandbox: shows a "Backdate" button so the reminder flow can be recorded right away. */
   demoMode: boolean
+  /** Where projects and activity are kept: Redis when REDIS_URL is set, else JSON files in .data/. */
+  storage: 'redis' | 'files'
   freelancer: { name: string; business: string; currency: string }
 }

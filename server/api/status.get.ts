@@ -11,6 +11,7 @@ export default defineEventHandler((): AppStatus => {
     aiProvider: ai.provider,
     aiModel: ai.model,
     demoMode: demoModeOn(),
+    storage: process.env.REDIS_URL ? 'redis' : 'files',
     freelancer: { name: freelancer.name, business: freelancer.business, currency: freelancer.currency },
   }
 })
