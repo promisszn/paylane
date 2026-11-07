@@ -47,6 +47,14 @@ export async function findByInvoiceId(invoiceId: string) {
   return null
 }
 
+/** Demo reset: forget every project and activity entry. PayPal's invoices are not touched. */
+export async function clearAll() {
+  const counts = { projects: (await listProjects()).length, activity: (await listActivity()).length }
+  await db().removeItem('projects')
+  await db().removeItem('activity')
+  return counts
+}
+
 export async function listActivity(): Promise<ActivityEntry[]> {
   return (await db().getItem<ActivityEntry[]>('activity')) ?? []
 }

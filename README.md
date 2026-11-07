@@ -6,7 +6,7 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) on t
 
 > Demo video: _add YouTube link_
 >
-> Live demo: _add URL_
+> Live demo: **[paylane.onrender.com](https://paylane.onrender.com)** (PayPal sandbox. Pay invoices with any [sandbox personal account](https://developer.paypal.com/dashboard/accounts). The first load can take up to a minute if the app has been idle.)
 
 ---
 
@@ -136,6 +136,14 @@ Payment reminders only matter once an invoice is late. To show them right away, 
 
 Demo mode only changes Paylane's local copy of the due date. PayPal keeps the real one, and every change is written to the activity log.
 
+**Start over.** Locally, delete the `.data/` folder. On any instance, including a deployed one, set `DEMO_RESET_TOKEN` to a long random string and run:
+
+```bash
+curl -X POST https://your-app/api/demo/reset -H "x-reset-token: YOUR_TOKEN"
+```
+
+This clears Paylane's projects and activity log. Invoices already on PayPal stay there. The reset needs `DEMO_MODE=true`, and there's no button for it, so visitors to a shared demo can't wipe it.
+
 ### Webhooks (optional)
 
 Locally, **Check for payments** pulls status from PayPal, so you don't need a public URL. On a deployed instance:
@@ -156,7 +164,7 @@ The repo includes a [Render Blueprint](render.yaml) that creates the web app and
 
 Locally, data lives in `.data/` as JSON files. When `REDIS_URL` is set, as the Blueprint does, it lives in Redis instead, so it survives redeploys. Any Redis works, Upstash included.
 
-Good to know: the free web service sleeps after about 15 minutes without visitors, so the first page load after that takes up to a minute. Everyone who opens the URL shares the same data, and `DEMO_MODE` is on so visitors can try **Backdate**.
+Good to know: the free web service sleeps after about 15 minutes without visitors, so the first page load after that takes up to a minute. Everyone who opens the URL shares the same data, and `DEMO_MODE` is on so visitors can try **Backdate**. Render generates `DEMO_RESET_TOKEN` for you (see the service's **Environment** page) for [resetting the demo data](#see-the-reminder-flow-without-waiting). Free Key Value instances don't save to disk, so a restart of the store on Render's side also clears the data.
 
 ### Troubleshooting
 
@@ -181,6 +189,7 @@ server/
     sync.post.ts                pull invoice status from PayPal
     webhooks/paypal.post.ts     verified PayPal webhooks
     demo/overdue.post.ts        demo mode: backdate a sent invoice (sandbox only)
+    demo/reset.post.ts          demo mode: clear projects and activity (needs DEMO_RESET_TOKEN)
   plugins/
     storage.ts                  JSON files in .data/ locally, Redis when REDIS_URL is set
   utils/

@@ -37,6 +37,9 @@ services:
       # Lets visitors use "Backdate" to see the reminder flow. Sandbox only.
       - key: DEMO_MODE
         value: "true"
+      # Secret for POST /api/demo/reset (wipes demo data). Render generates it; copy it from Environment.
+      - key: DEMO_RESET_TOKEN
+        generateValue: true
       # --- Storage: projects and activity live in the Key Value store below ---
       - key: REDIS_URL
         fromService:
