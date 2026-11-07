@@ -1,0 +1,245 @@
+/* Paylane: carbon-copy invoice book. Blue carbon ink, cool paper, a green PAID stamp. */
+:root {
+  --desk: #e6eaf0;
+  --paper: #f7f8fa;
+  --paper-pure: #ffffff;
+  --ink: #16233f;
+  --ink-soft: #4a5672;
+  --ink-faint: #7d879c;
+  --carbon: #2747c9;
+  --carbon-soft: #e3e8fb;
+  --paid: #18794e;
+  --paid-soft: #e0f1e8;
+  --overdue: #b4322a;
+  --overdue-soft: #f8e4e2;
+  --draft: #8a5a00;
+  --draft-soft: #fbf0d9;
+  --rule: #cdd4de;
+  --rule-soft: #e1e6ed;
+
+  --font-ui: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-money: 'Spline Sans Mono', ui-monospace, monospace;
+
+  /* Type scale (1.2 minor third) */
+  --t-xs: 0.8125rem;
+  --t-sm: 0.9375rem;
+  --t-md: 1.0625rem;
+  --t-lg: 1.375rem;
+  --t-xl: 1.75rem;
+  --t-2xl: 2.375rem;
+
+  /* Motion (Emil Kowalski): strong custom curves, short durations, nothing decorative. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-press: 160ms;
+  --dur-enter: 220ms;
+  --dur-exit: 150ms;
+
+  --radius-sheet: 3px;
+  --radius-control: 6px;
+  --shadow-sheet: 0 1px 0 var(--rule), 0 8px 24px -16px rgb(22 35 63 / 0.35);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--desk);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+}
+
+.money {
+  font-family: var(--font-money);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-control);
+  background: var(--ink);
+  color: var(--paper-pure);
+  font: 600 var(--t-sm) / 1 var(--font-ui);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-press) var(--ease-out),
+    border-color var(--dur-press) var(--ease-out),
+    color var(--dur-press) var(--ease-out);
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    background: var(--carbon);
+    border-color: var(--carbon);
+  }
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+.btn--quiet {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--rule);
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn--quiet:hover {
+    background: var(--paper-pure);
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+}
+.btn--small {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  font-size: var(--t-xs);
+}
+.btn--danger {
+  background: transparent;
+  color: var(--overdue);
+  border-color: var(--overdue-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn--danger:hover {
+    background: var(--overdue-soft);
+    border-color: var(--overdue);
+    color: var(--overdue);
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--carbon);
+  outline-offset: 2px;
+}
+
+/* Form controls */
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+.field__label {
+  font-size: var(--t-xs);
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.input,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-pure);
+  color: var(--ink);
+  font: var(--t-sm) / 1.5 var(--font-ui);
+  padding: 0.55rem 0.7rem;
+}
+.input,
+.textarea {
+  transition:
+    border-color var(--dur-press) var(--ease-out),
+    box-shadow var(--dur-press) var(--ease-out);
+}
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--carbon);
+  box-shadow: 0 0 0 3px var(--carbon-soft);
+}
+.textarea {
+  resize: vertical;
+}
+
+/* Status stamps, used in the grid and on the receipt */
+.stamp {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  font: 600 var(--t-xs) / 1.4 var(--font-ui);
+  white-space: nowrap;
+}
+.stamp--planned {
+  color: var(--ink-faint);
+  border-style: dashed;
+}
+.stamp--draft {
+  color: var(--draft);
+  background: var(--draft-soft);
+}
+.stamp--sent {
+  color: var(--carbon);
+  background: var(--carbon-soft);
+}
+.stamp--overdue {
+  color: var(--overdue);
+  background: var(--overdue-soft);
+}
+.stamp--paid {
+  color: var(--paid);
+  background: var(--paid-soft);
+  transform: rotate(-3deg);
+}
+.stamp--cancelled {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Reduced motion: keep fades (they help comprehension), remove movement and scale. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-press: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+}
