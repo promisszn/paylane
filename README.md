@@ -146,6 +146,18 @@ Locally, **Check for payments** pulls status from PayPal, so you don't need a pu
 
 Payments then show up on their own. Every event is verified with PayPal before it's used.
 
+### Deploy to Render
+
+The repo includes a [Render Blueprint](render.yaml) that creates the web app and a Key Value (Redis) store for its data.
+
+1. In [Render](https://dashboard.render.com), choose **New → Blueprint** and connect this repository.
+2. Fill in the values it asks for: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `GOOGLE_GENERATIVE_AI_API_KEY`, `FREELANCER_NAME` and `FREELANCER_BUSINESS`. Leave `PAYPAL_WEBHOOK_ID` empty until you register the webhook.
+3. Click **Apply**. The first build takes a few minutes.
+
+Locally, data lives in `.data/` as JSON files. When `REDIS_URL` is set, as the Blueprint does, it lives in Redis instead, so it survives redeploys. Any Redis works, Upstash included.
+
+Good to know: the free web service sleeps after about 15 minutes without visitors, so the first page load after that takes up to a minute. Everyone who opens the URL shares the same data, and `DEMO_MODE` is on so visitors can try **Backdate**.
+
 ### Troubleshooting
 
 | You see | Cause | Fix |
@@ -168,11 +180,14 @@ server/
     dashboard.get.ts            stats, ledger rows, suggestions, activity
     sync.post.ts                pull invoice status from PayPal
     webhooks/paypal.post.ts     verified PayPal webhooks
+    demo/overdue.post.ts        demo mode: backdate a sent invoice (sandbox only)
+  plugins/
+    storage.ts                  JSON files in .data/ locally, Redis when REDIS_URL is set
   utils/
     paypal.ts                   PayPal REST client
     ai.ts                       the agent: plan, invoice email, reminder
     billing.ts                  approval flow, suggestion rules, ledger rows
-    store.ts                    JSON storage in .data/
+    store.ts                    projects and activity log on top of that storage
 components/
   JobIntake.vue                 paste a client message
   PlanReceipt.vue               editable plan, approve
@@ -188,9 +203,10 @@ types/index.ts                  shared types
 - **PayPal Invoicing v2 and Webhooks APIs** (sandbox)
 - **Google Gemini** via the Vercel AI SDK (`@ai-sdk/google`), with Claude and OpenAI as options
 - **AG Grid Community** for the receivables ledger
-- **Nuxt 3**, Vue 3, TypeScript, Zod
+- **Nuxt 4**, Vue 3, TypeScript, Zod
+- **Render** for hosting, with Render Key Value (Redis) for data
 
-Data is stored as JSON in `.data/` so the project runs with no database.
+Locally, data is stored as JSON in `.data/` so the project runs with no database.
 
 ## License
 

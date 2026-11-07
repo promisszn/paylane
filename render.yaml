@@ -1,0 +1,52 @@
+# Render Blueprint: Dashboard > New > Blueprint > pick this repo.
+# Creates the web app and a Key Value (Redis) store for its data.
+# Values marked `sync: false` are secrets: Render asks for them when you create the Blueprint.
+services:
+  - type: web
+    name: paylane
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node .output/server/index.mjs
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # --- PayPal (sandbox only) ---
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      # Fill in after registering the webhook (README > Webhooks). Can stay empty until then.
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      # --- AI ---
+      - key: AI_PROVIDER
+        value: google
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      # --- You, the freelancer (shown on invoices) ---
+      - key: FREELANCER_NAME
+        sync: false
+      - key: FREELANCER_BUSINESS
+        sync: false
+      - key: DEFAULT_CURRENCY
+        value: USD
+      # Lets visitors use "Backdate" to see the reminder flow. Sandbox only.
+      - key: DEMO_MODE
+        value: "true"
+      # --- Storage: projects and activity live in the Key Value store below ---
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: paylane-data
+          property: connectionString
+
+  - type: keyvalue
+    name: paylane-data
+    plan: free
+    # Only reachable from your other Render services, not the internet.
+    ipAllowList: []
+    maxmemoryPolicy: noeviction

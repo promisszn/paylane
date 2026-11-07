@@ -50,12 +50,8 @@ export default defineNuxtConfig({
     },
   },
 
-  nitro: {
-    // Local JSON storage so the project runs with zero external services.
-    storage: {
-      db: { driver: 'fs', base: './.data/db' },
-    },
-  },
+  // The "db" store is mounted at startup by server/plugins/storage.ts:
+  // JSON files in ./.data/db locally, Redis when REDIS_URL is set (hosted).
 
   typescript: { strict: true },
 })
