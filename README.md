@@ -58,7 +58,7 @@ All calls go to the PayPal REST APIs in [`server/utils/paypal.ts`](server/utils/
 | `POST /v2/invoicing/invoices/{id}/cancel` | Cancel a sent invoice |
 | `GET /v2/invoicing/invoices/{id}` | Read status and the client's pay link |
 | `POST /v1/notifications/verify-webhook-signature` | Verify every incoming webhook before trusting it |
-| Webhook `INVOICING.INVOICE.PAID` | Mark a milestone paid the moment the client pays |
+| Webhook `INVOICING.INVOICE.PAID` | On a deployed instance, mark a milestone paid the moment the client pays. Locally, **Check for payments** does the same by asking PayPal (see [Webhooks](#webhooks-optional)) |
 
 ## How AI is used
 
