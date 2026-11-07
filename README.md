@@ -90,7 +90,7 @@ You need **Node 20+**, **npm**, a free **PayPal Developer** account and an **Ant
 ### 2. Install and configure
 
 ```bash
-git clone https://github.com/<you>/paylane.git
+git clone https://github.com/promisszn/paylane.git
 cd paylane
 npm install
 cp .env.example .env
