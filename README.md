@@ -62,7 +62,7 @@ All calls go to the PayPal REST APIs in [`server/utils/paypal.ts`](server/utils/
 
 ## How AI is used
 
-The agent lives in [`server/utils/ai.ts`](server/utils/ai.ts). It uses the [Vercel AI SDK](https://ai-sdk.dev) with **Claude** (default) or **OpenAI**, and every call returns structured output validated by a Zod schema, so the app never parses free text.
+The agent lives in [`server/utils/ai.ts`](server/utils/ai.ts). It uses **Google Gemini** (`gemini-flash-lite-latest` by default) through the [Vercel AI SDK](https://ai-sdk.dev), and every call returns structured output validated by a Zod schema, so the app never parses free text. Claude and OpenAI work too: set `AI_PROVIDER` to `anthropic` or `openai` and add that key.
 
 | Job | Input | Output |
 | --- | --- | --- |
@@ -78,14 +78,17 @@ Guardrails in code: milestone amounts are re-balanced so they always add up to t
 
 ## Run it yourself
 
-You need **Node 20+**, **npm**, a free **PayPal Developer** account and an **Anthropic** (or OpenAI) API key. Setup takes about 5 minutes.
+You need **Node 20+**, **npm**, a free **PayPal Developer** account and a free **Gemini API key** from [Google AI Studio](https://aistudio.google.com/apikey). Setup takes about 5 minutes.
 
 ### 1. Get PayPal sandbox credentials
 
 1. Sign in at [developer.paypal.com](https://developer.paypal.com/dashboard/) and make sure the toggle says **Sandbox**.
-2. Go to **Apps & Credentials → Create App**, type **Merchant**, keep the default sandbox business account.
-3. Copy the **Client ID** and **Secret**.
-4. Go to **Testing Tools → Sandbox Accounts** and note the **personal** account's email and password. That account plays your client and pays your invoices.
+2. Go to **Testing Tools → Sandbox Accounts → Create account**. Choose **Business** and **United States**. This account receives your invoice payments.
+   The default sandbox business account is created in your own country, and PayPal accounts in some countries can't receive payments. Invoices then send fine but fail at payment.
+3. Go to **Apps & Credentials → Create App**, type **Merchant**, and pick the US business account from step 2.
+4. Open the app, scroll to **Features**, tick **Invoicing** and click **Save Changes**. Without it, creating an invoice fails.
+5. Copy the app's **Client ID** and **Secret**.
+6. Back in **Sandbox Accounts**, note the **personal** account's email and password. That account plays your client and pays your invoices.
 
 ### 2. Install and configure
 
@@ -101,7 +104,8 @@ Fill in `.env`:
 ```bash
 PAYPAL_CLIENT_ID=...        # from step 1
 PAYPAL_CLIENT_SECRET=...
-ANTHROPIC_API_KEY=...       # or AI_PROVIDER=openai + OPENAI_API_KEY, or AI_PROVIDER=google + GOOGLE_GENERATIVE_AI_API_KEY
+GOOGLE_GENERATIVE_AI_API_KEY=...  # Gemini, free at aistudio.google.com/apikey
+# To use Claude or OpenAI instead: AI_PROVIDER=anthropic + ANTHROPIC_API_KEY, or AI_PROVIDER=openai + OPENAI_API_KEY
 FREELANCER_NAME=Your Name   # appears on invoices
 FREELANCER_BUSINESS=Your Studio
 ```
@@ -142,6 +146,15 @@ Locally, **Check for payments** pulls status from PayPal, so you don't need a pu
 
 Payments then show up on their own. Every event is verified with PayPal before it's used.
 
+### Troubleshooting
+
+| You see | Cause | Fix |
+| --- | --- | --- |
+| `PayPal: NOT_AUTHORIZED: Authorization failed due to insufficient permissions` when approving a plan | The app doesn't have Invoicing turned on | In the app's **Features**, tick **Invoicing** and save. Then click **Draft** on the row in the ledger. |
+| The PayPal pay page shows an error, and its URL contains `code=UEFZRUVfQUNDT1VOVF9MT0NLRURfT1JfQ0xPU0VE` (`PAYEE_ACCOUNT_LOCKED_OR_CLOSED`) | The business account can't receive payments, often because of its country | Create a **US** business sandbox account, make a new app on it (step 1), and use that app's keys. |
+| The page says an AI key is missing | `AI_PROVIDER` doesn't match the key you filled in | Set `AI_PROVIDER=google` with `GOOGLE_GENERATIVE_AI_API_KEY`, or switch both to Anthropic or OpenAI. |
+| A change to `.env` doesn't take effect | The dev server is still using the old values | Stop `npm run dev` and start it again. |
+
 ---
 
 ## Project structure
@@ -173,7 +186,7 @@ types/index.ts                  shared types
 ## Tools used
 
 - **PayPal Invoicing v2 and Webhooks APIs** (sandbox)
-- **Claude** via the Vercel AI SDK (`@ai-sdk/anthropic`), with OpenAI as an option
+- **Google Gemini** via the Vercel AI SDK (`@ai-sdk/google`), with Claude and OpenAI as options
 - **AG Grid Community** for the receivables ledger
 - **Nuxt 3**, Vue 3, TypeScript, Zod
 

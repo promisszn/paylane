@@ -37,7 +37,7 @@ export default defineNuxtConfig({
       webhookId: process.env.PAYPAL_WEBHOOK_ID ?? '',
     },
     ai: {
-      provider: process.env.AI_PROVIDER ?? 'anthropic',
+      provider: process.env.AI_PROVIDER ?? 'google',
       model: process.env.AI_MODEL ?? '',
       anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',
       openaiKey: process.env.OPENAI_API_KEY ?? '',

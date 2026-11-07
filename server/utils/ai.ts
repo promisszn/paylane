@@ -31,7 +31,8 @@ const KEY_ENV: Record<Provider, string> = {
 
 export function aiInfo() {
   const { ai } = useRuntimeConfig()
-  const provider: Provider = ai.provider === 'openai' || ai.provider === 'google' ? ai.provider : 'anthropic'
+  // Gemini is the default (free tier); Claude and OpenAI are opt-in.
+  const provider: Provider = ai.provider === 'anthropic' || ai.provider === 'openai' ? ai.provider : 'google'
   const key = { anthropic: ai.anthropicKey, openai: ai.openaiKey, google: ai.googleKey }[provider]
   return { provider, model: ai.model || DEFAULT_MODELS[provider], ready: Boolean(key), key }
 }
