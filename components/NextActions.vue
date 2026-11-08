@@ -11,6 +11,12 @@ const verb: Record<NextAction['kind'], string> = {
   invoice_next: 'Mark done and draft invoice',
 }
 
+const toneLabel: Record<NonNullable<NextAction['tone']>, string> = {
+  friendly: 'Friendly nudge',
+  clear: 'Clear follow-up',
+  firm: 'Firm notice',
+}
+
 function act(a: NextAction) {
   if (a.kind === 'send_draft') return reviewInvoice(a.projectId, a.milestoneId)
   if (a.kind === 'remind') return reviewReminder(a.projectId, a.milestoneId)
@@ -29,7 +35,10 @@ const isBusy = (a: NextAction) => busy.value?.endsWith(a.milestoneId) ?? false
     <TransitionGroup v-else tag="ul" name="next" class="next__list">
       <li v-for="a in actions" :key="a.kind + a.milestoneId" class="next__item" :data-kind="a.kind">
         <div>
-          <p class="next__item-title">{{ a.title }}</p>
+          <p class="next__item-title">
+            {{ a.title }}
+            <span v-if="a.tone" class="next__tone" :data-tone="a.tone">{{ toneLabel[a.tone] }}</span>
+          </p>
           <p class="next__item-detail">{{ a.detail }}</p>
         </div>
         <button class="btn btn--small" :class="{ 'btn--quiet': a.kind === 'invoice_next' }" :disabled="isBusy(a)" @click="act(a)">
@@ -99,6 +108,26 @@ const isBusy = (a: NextAction) => busy.value?.endsWith(a.milestoneId) ?? false
 }
 .next__item-title {
   font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.next__tone {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--carbon-soft);
+  color: var(--carbon);
+}
+.next__tone[data-tone='clear'] {
+  background: var(--draft-soft);
+  color: var(--draft);
+}
+.next__tone[data-tone='firm'] {
+  background: var(--overdue-soft);
+  color: var(--overdue);
 }
 .next__item-detail {
   color: var(--ink-soft);

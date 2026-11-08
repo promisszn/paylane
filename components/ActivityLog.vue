@@ -63,4 +63,14 @@ const when = (iso: string) =>
   color: var(--ink-faint);
   white-space: nowrap;
 }
+@media (max-width: 520px) {
+  .log__item {
+    grid-template-columns: 3.6rem 1fr;
+    gap: 0.25rem 0.6rem;
+  }
+  .log__when {
+    grid-column: 2;
+    font-size: 0.72rem;
+  }
+}
 </style>

@@ -2,8 +2,9 @@
 /** The headline: where your money stands, as one plain sentence. */
 const { data } = useDashboard()
 const s = computed(() => data.value?.stats)
-const m = (n: number) => formatMoney(n, s.value?.currency ?? 'USD')
-const empty = computed(() => !s.value || (!s.value.outstanding && !s.value.paid && !s.value.pipeline))
+const m = (n: number, cur?: string) => formatMoney(n, cur ?? s.value?.currency ?? 'USD')
+const others = computed(() => s.value?.otherCurrencies ?? [])
+const empty = computed(() => !s.value || (!s.value.outstanding && !s.value.paid && !s.value.pipeline && !others.value.length))
 </script>
 
 <template>
@@ -21,6 +22,13 @@ const empty = computed(() => !s.value || (!s.value.outstanding && !s.value.paid 
     <p v-if="s && (s.paid || s.pipeline)" class="status__sub">
       <template v-if="s.paid"><span class="money">{{ m(s.paid) }}</span> collected through PayPal. </template>
       <template v-if="s.pipeline"><span class="money">{{ m(s.pipeline) }}</span> still to bill on active jobs.</template>
+    </p>
+
+    <p v-for="o in others" :key="o.currency" class="status__sub status__sub--other">
+      Also in {{ o.currency }}:
+      <template v-if="o.outstanding"><span class="money">{{ m(o.outstanding, o.currency) }}</span> owed<template v-if="o.overdue"> (<span class="money">{{ m(o.overdue, o.currency) }}</span> overdue)</template>. </template>
+      <template v-if="o.paid"><span class="money">{{ m(o.paid, o.currency) }}</span> paid. </template>
+      <template v-if="o.pipeline"><span class="money">{{ m(o.pipeline, o.currency) }}</span> in pipeline.</template>
     </p>
   </section>
 </template>

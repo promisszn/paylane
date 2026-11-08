@@ -107,10 +107,7 @@ const columnDefs: ColDef<ReceivableRow>[] = [
   },
 ]
 
-function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
-  const action = (e.event?.target as HTMLElement | null)?.closest<HTMLElement>('[data-action]')?.dataset.action
-  const r = e.data
-  if (!action || !r) return
+function runAction(action: string, r: ReceivableRow) {
   if (action === 'draft' || action === 'send') reviewInvoice(r.projectId, r.milestoneId)
   else if (action === 'done') reviewInvoice(r.projectId, r.milestoneId, true)
   else if (action === 'remind') reviewReminder(r.projectId, r.milestoneId)
@@ -118,21 +115,72 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
   else if (action === 'overdue') makeOverdue(r.projectId, r.milestoneId, r.daysOverdue)
   else if (action === 'pay' && r.payerUrl) window.open(r.payerUrl, '_blank', 'noopener')
 }
+
+function formatDueDate(iso: string | null) {
+  return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''
+}
+
+function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
+  const action = (e.event?.target as HTMLElement | null)?.closest<HTMLElement>('[data-action]')?.dataset.action
+  const r = e.data
+  if (!action || !r) return
+  runAction(action, r)
+}
 </script>
 
 <template>
-  <AgGridVue
-    class="grid"
-    :theme="theme"
-    :row-data="data?.rows ?? []"
-    :column-defs="columnDefs"
-    :default-col-def="{ sortable: true, resizable: true, suppressMovable: true }"
-    :get-row-id="(p: { data: ReceivableRow }) => p.data.milestoneId"
-    :dom-layout="'autoHeight'"
-    :tooltip-show-mode="'whenTruncated'"
-    :overlay-no-rows-template="'<span>Approved jobs show up here, one row per payment.</span>'"
-    @cell-clicked="onCellClicked"
-  />
+  <div class="receivables">
+    <AgGridVue
+      class="grid receivables__desktop"
+      :theme="theme"
+      :row-data="data?.rows ?? []"
+      :column-defs="columnDefs"
+      :default-col-def="{ sortable: true, resizable: true, suppressMovable: true }"
+      :get-row-id="(p: { data: ReceivableRow }) => p.data.milestoneId"
+      :dom-layout="'autoHeight'"
+      :tooltip-show-mode="'whenTruncated'"
+      :overlay-no-rows-template="'<span>Approved jobs show up here, one row per payment.</span>'"
+      @cell-clicked="onCellClicked"
+    />
+
+    <!-- Responsive mobile card list (< 768px) where the 9-column grid would horizontally overflow -->
+    <div class="receivables__mobile">
+      <p v-if="!(data?.rows.length)" class="receivables__empty">
+        Approved jobs show up here, one row per payment.
+      </p>
+      <ul v-else class="receivables__cards">
+        <li v-for="r in data?.rows" :key="r.milestoneId" class="rcard">
+          <div class="rcard__top">
+            <div>
+              <p class="rcard__milestone">{{ r.milestone }}</p>
+              <p class="rcard__job">{{ r.client }} · {{ r.project }}</p>
+            </div>
+            <strong class="money rcard__amount">{{ formatMoney(r.amount, r.currency) }}</strong>
+          </div>
+
+          <div class="rcard__meta">
+            <span class="stamp" :class="`stamp--${statusLabel(r).cls}`">{{ statusLabel(r).text }}</span>
+            <span v-if="r.invoiceNumber" class="rcard__tag">#{{ r.invoiceNumber }}</span>
+            <span v-if="r.dueDate" class="rcard__tag">Due {{ formatDueDate(r.dueDate) }}</span>
+            <span v-if="r.reminders" class="rcard__tag">{{ r.reminders }} nudge{{ r.reminders === 1 ? '' : 's' }}</span>
+          </div>
+
+          <div v-if="actionsFor(r).length" class="rcard__actions">
+            <button
+              v-for="[key, label] in actionsFor(r)"
+              :key="key"
+              type="button"
+              class="grid-action"
+              :data-action="key"
+              @click="runAction(key, r)"
+            >
+              {{ label }}
+            </button>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
 </template>
 
 <style>
@@ -175,5 +223,81 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
 }
 .grid-action[data-action='cancel'] {
   color: var(--ink-faint);
+}
+.receivables__mobile {
+  display: none;
+}
+.receivables__empty {
+  padding: 1.5rem;
+  background: var(--paper-pure);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sheet);
+  color: var(--ink-soft);
+}
+.receivables__cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.rcard {
+  background: var(--paper-pure);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sheet);
+  padding: 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+.rcard__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.rcard__milestone {
+  font-weight: 600;
+  color: var(--ink);
+}
+.rcard__job {
+  font-size: var(--t-xs);
+  color: var(--ink-soft);
+  margin-top: 0.1rem;
+}
+.rcard__amount {
+  font-size: var(--t-md);
+  white-space: nowrap;
+}
+.rcard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--t-xs);
+  color: var(--ink-soft);
+}
+.rcard__tag {
+  padding: 0.1rem 0.45rem;
+  background: var(--paper);
+  border-radius: 4px;
+}
+.rcard__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--rule-soft);
+}
+.rcard__actions .grid-action {
+  margin-right: 0;
+  padding: 0.35rem 0.75rem;
+}
+@media (max-width: 767px) {
+  .receivables__desktop {
+    display: none;
+  }
+  .receivables__mobile {
+    display: block;
+  }
 }
 </style>

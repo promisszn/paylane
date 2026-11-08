@@ -28,13 +28,21 @@ watch(
 
 const sending = computed(() => busy.value?.startsWith('send:') || busy.value?.startsWith('remind:'))
 const cta = computed(() => (shown.value?.mode === 'reminder' ? 'Send reminder' : 'Send invoice'))
+const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
+  friendly: 'Tone: Friendly nudge (1–3 days overdue)',
+  clear: 'Tone: Clear follow-up (4–14 days overdue or 2nd reminder)',
+  firm: 'Tone: Firm notice (15+ days overdue or 3rd+ reminder)',
+}
 </script>
 
 <template>
   <dialog ref="dialog" class="review" aria-labelledby="review-heading" @close="pendingEmail = null">
     <form v-if="shown" method="dialog" class="review__form" @submit.prevent="sendPending(subject, note)">
       <header>
-        <p class="review__eyebrow">Drafted by the agent. Edit anything before it goes out.</p>
+        <p class="review__eyebrow">
+          Drafted by the agent. Edit anything before it goes out.
+          <span v-if="shown.tone" class="review__tone" :data-tone="shown.tone">{{ toneDescription[shown.tone] }}</span>
+        </p>
         <h2 id="review-heading" class="review__title">{{ shown.heading }}</h2>
       </header>
 
@@ -130,6 +138,26 @@ const cta = computed(() => (shown.value?.mode === 'reminder' ? 'Send reminder' :
 .review__eyebrow {
   font-size: var(--t-xs);
   color: var(--ink-faint);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+.review__tone {
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--carbon-soft);
+  color: var(--carbon);
+}
+.review__tone[data-tone='clear'] {
+  background: var(--draft-soft);
+  color: var(--draft);
+}
+.review__tone[data-tone='firm'] {
+  background: var(--overdue-soft);
+  color: var(--overdue);
 }
 .review__title {
   margin-top: 0.25rem;

@@ -1,11 +1,21 @@
-import type { ActivityEntry, AppStatus, NextAction, Project, ProjectPlan, ReceivableRow } from '~/types'
+import type {
+  ActivityEntry,
+  AppStatus,
+  CurrencySummary,
+  IntakeAttachment,
+  NextAction,
+  Project,
+  ProjectPlan,
+  ReceivableRow,
+  ReminderTone,
+} from '~/types'
 
 export interface DashboardData {
   projects: Project[]
   rows: ReceivableRow[]
   actions: NextAction[]
   activity: ActivityEntry[]
-  stats: { currency: string; outstanding: number; overdue: number; paid: number; pipeline: number }
+  stats: CurrencySummary & { otherCurrencies?: CurrencySummary[] }
 }
 
 /** The email the user reviews before anything is sent. */
@@ -17,6 +27,7 @@ export interface PendingEmail {
   to: string
   subject: string
   note: string
+  tone?: ReminderTone
 }
 
 export interface Toast {
@@ -75,11 +86,13 @@ export function useDashboard() {
 
   const findProject = (id: string) => data.value?.projects.find((p) => p.id === id)
 
-  async function planJob(message: string) {
-    const res = await run('plan', () => $fetch<{ plan: ProjectPlan }>('/api/agent/plan', { method: 'POST', body: { message } }))
+  async function planJob(message: string, attachment?: IntakeAttachment) {
+    const res = await run('plan', () =>
+      $fetch<{ plan: ProjectPlan }>('/api/agent/plan', { method: 'POST', body: { message, attachment } }),
+    )
     if (res) {
       plan.value = res.plan
-      sourceMessage.value = message
+      sourceMessage.value = message || (attachment ? `[Attached: ${attachment.name}]` : '')
     }
   }
 
@@ -100,7 +113,7 @@ export function useDashboard() {
 
   async function milestoneAction(action: string, projectId: string, milestoneId: string, extra: Record<string, string> = {}) {
     return run(`${action}:${milestoneId}`, () =>
-      $fetch<{ project: Project; milestone: Project['milestones'][number]; reminderDraft?: { subject: string; note: string } }>(
+      $fetch<{ project: Project; milestone: Project['milestones'][number]; reminderDraft?: { subject: string; note: string; tone?: ReminderTone } }>(
         `/api/milestones/${action}`,
         { method: 'POST', body: { projectId, milestoneId, ...extra } },
       ),

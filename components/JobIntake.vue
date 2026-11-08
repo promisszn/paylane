@@ -1,6 +1,10 @@
 <script setup lang="ts">
-const { planJob, busy } = useDashboard()
+import type { IntakeAttachment } from '~/types'
+
+const { planJob, busy, notify } = useDashboard()
 const message = ref('')
+const attachment = ref<IntakeAttachment | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 const examples = [
   {
@@ -17,16 +21,49 @@ const examples = [
   },
 ]
 
+const canSubmit = computed(() => busy.value !== 'plan' && (message.value.trim().length >= 10 || Boolean(attachment.value)))
+
+function readFile(file: File) {
+  if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'].includes(file.type)) {
+    notify('Use a PNG, JPEG, WebP screenshot or PDF scope.', 'error')
+    return
+  }
+  if (file.size > 6 * 1024 * 1024) {
+    notify('File is too large (max 6 MB).', 'error')
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    const result = String(reader.result ?? '')
+    const base64 = result.includes(',') ? result.split(',')[1]! : result
+    attachment.value = { name: file.name, mediaType: file.type, data: base64 }
+  }
+  reader.readAsDataURL(file)
+}
+
+function onFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) readFile(file)
+  input.value = ''
+}
+
+function onPaste(e: ClipboardEvent) {
+  const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith('image/'))
+  const file = item?.getAsFile()
+  if (file) readFile(file)
+}
+
 async function submit() {
-  if (message.value.trim().length < 10) return
-  await planJob(message.value)
+  if (!canSubmit.value) return
+  await planJob(message.value, attachment.value ?? undefined)
 }
 </script>
 
 <template>
   <section class="intake" aria-labelledby="intake-heading">
     <h2 id="intake-heading" class="intake__title">New job</h2>
-    <p class="intake__hint">Paste what the client sent you. The agent works out the payment plan, you approve it.</p>
+    <p class="intake__hint">Paste what the client sent you (or attach a screenshot / PDF). The agent works out the payment plan, you approve it.</p>
 
     <form class="intake__form" @submit.prevent="submit">
       <label class="visually-hidden" for="client-message">Client message</label>
@@ -35,13 +72,30 @@ async function submit() {
         v-model="message"
         class="textarea intake__textarea"
         rows="7"
-        placeholder="e.g. Approved! $1,200 for the app screens, 50% to start…"
+        placeholder="e.g. Approved! $1,200 for the app screens, 50% to start… (you can also paste a screenshot)"
+        @paste="onPaste"
         @keydown.meta.enter="submit"
         @keydown.ctrl.enter="submit"
       />
+
+      <div v-if="attachment" class="intake__attachment">
+        <span class="intake__attachment-name">{{ attachment.name }}</span>
+        <button type="button" class="intake__attachment-remove" @click="attachment = null">Remove</button>
+      </div>
+
       <div class="intake__row">
-        <button class="btn" type="submit" :disabled="busy === 'plan' || message.trim().length < 10">
+        <button class="btn" type="submit" :disabled="!canSubmit">
           {{ busy === 'plan' ? 'Reading the message…' : 'Plan payments' }}
+        </button>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,application/pdf"
+          class="visually-hidden"
+          @change="onFileChange"
+        />
+        <button type="button" class="btn btn--quiet btn--small" @click="fileInput?.click()">
+          {{ attachment ? 'Change file' : 'Attach screenshot / PDF' }}
         </button>
         <span class="intake__kbd">or ⌘ Enter</span>
       </div>
@@ -51,7 +105,7 @@ async function submit() {
       <p class="intake__examples-label">Try an example</p>
       <ul>
         <li v-for="ex in examples" :key="ex.label">
-          <button type="button" class="intake__example" @click="message = ex.text">{{ ex.label }}</button>
+          <button type="button" class="intake__example" @click="message = ex.text; attachment = null">{{ ex.label }}</button>
         </li>
       </ul>
     </div>
@@ -88,8 +142,34 @@ async function submit() {
 }
 .intake__row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+}
+.intake__attachment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.75rem;
+  background: var(--carbon-soft);
+  color: var(--carbon);
+  border-radius: var(--radius-control);
+  font-size: var(--t-xs);
+  font-weight: 500;
+}
+.intake__attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.intake__attachment-remove {
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font: var(--t-xs) var(--font-ui);
+  text-decoration: underline;
+  cursor: pointer;
 }
 .intake__kbd {
   color: var(--ink-faint);
