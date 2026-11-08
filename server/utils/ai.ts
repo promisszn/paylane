@@ -10,9 +10,9 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
-import { generateText, Output } from 'ai'
+import { generateText, Output, type UserContent } from 'ai'
 import { z } from 'zod'
-import type { Milestone, Project, ProjectPlan } from '../../types'
+import type { IntakeAttachment, Milestone, Project, ProjectPlan, ReminderTone } from '../../types'
 
 const DEFAULT_MODELS = {
   anthropic: 'claude-sonnet-5-5',
@@ -50,11 +50,17 @@ function model() {
   return createAnthropic({ apiKey: info.key })(info.model)
 }
 
-async function structured<T>(schema: z.ZodType<T>, system: string, prompt: string): Promise<T> {
+async function structured<T>(
+  schema: z.ZodType<T>,
+  system: string,
+  promptOrContent: string | UserContent,
+): Promise<T> {
   const { output } = await generateText({
     model: model(),
     system,
-    prompt,
+    ...(typeof promptOrContent === 'string'
+      ? { prompt: promptOrContent }
+      : { messages: [{ role: 'user', content: promptOrContent }] }),
     output: Output.object({ schema }),
   })
   if (!output) throw createError({ statusCode: 502, statusMessage: 'The model returned no usable output. Try again.' })
@@ -89,12 +95,31 @@ const planSchema = z.object({
   questions: z.array(z.string()).describe('Anything ambiguous the freelancer should confirm before invoicing. Empty if all clear.'),
 })
 
-export async function planFromMessage(message: string, defaultCurrency: string): Promise<ProjectPlan> {
+export async function planFromMessage(
+  message: string,
+  defaultCurrency: string,
+  attachment?: IntakeAttachment,
+): Promise<ProjectPlan> {
+  const today = new Date().toISOString().slice(0, 10)
+  const textPrompt = message.trim()
+    ? `Client message:\n"""\n${message}\n"""`
+    : 'Extract the deal details, client, total and payment milestones from the attached screenshot or document.'
+
+  const userContent: string | UserContent = attachment
+    ? [
+        { type: 'text', text: textPrompt },
+        attachment.mediaType.startsWith('image/')
+          ? { type: 'image', image: attachment.data, mediaType: attachment.mediaType }
+          : { type: 'file', data: attachment.data, mediaType: attachment.mediaType, filename: attachment.name },
+      ]
+    : textPrompt
+
   const plan = await structured(
     planSchema,
     [
       'You are the billing assistant for an independent freelancer.',
-      'You read a message from a client (or the freelancer\'s own notes about a deal) and turn it into a payment plan of milestones.',
+      'You read a message, chat screenshot or scope document from a client (or the freelancer\'s own notes about a deal) and turn it into a payment plan of milestones.',
+      `Today's date is ${today}. Use this when a message mentions relative timing (e.g. "net 14" = 14 dueDays, "due upon receipt" = 0 dueDays).`,
       'Rules:',
       '- Milestone amounts MUST add up exactly to the total.',
       '- If the message mentions a deposit or "half upfront", make that the first milestone with trigger "upfront".',
@@ -104,7 +129,7 @@ export async function planFromMessage(message: string, defaultCurrency: string):
       '- Never invent an email address. If none is given, set email to null and add a question asking for it.',
       '- Keep names and descriptions short and professional. They appear on a real invoice.',
     ].join('\n'),
-    `Client message:\n"""\n${message}\n"""`,
+    userContent,
   )
 
   // Guard against rounding drift so the invoice totals always match the deal.
@@ -175,7 +200,7 @@ export async function draftReminder(project: Project, milestone: Milestone, days
             : `past its due date of ${dueLabel}, within the grace period`
   // The tone is a rule, not a model judgement, so it is predictable and matches the docs.
   const tone = reminderTone(daysOverdue, previous)
-  return structured(
+  const draft = await structured(
     emailSchema,
     [
       `You write payment reminders for ${freelancer.name}, a freelancer who wants to get paid AND keep the client.`,
@@ -200,10 +225,11 @@ export async function draftReminder(project: Project, milestone: Milestone, days
       previousReminders: previous,
     }),
   )
+  return { ...draft, tone }
 }
 
 /** friendly up to 3 days late, clear from 4 days or after 1 reminder, firm from 15 days or after 2. */
-export function reminderTone(daysOverdue: number, previousReminders: number): 'friendly' | 'clear' | 'firm' {
+export function reminderTone(daysOverdue: number, previousReminders: number): ReminderTone {
   if (daysOverdue >= 15 || previousReminders >= 2) return 'firm'
   if (daysOverdue >= 4 || previousReminders >= 1) return 'clear'
   return 'friendly'

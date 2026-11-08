@@ -9,12 +9,25 @@ const db = () => useStorage('db')
 
 export const newId = () => randomUUID().slice(0, 8)
 
+// Serialize read-modify-write operations on the JSON store so concurrent requests
+// (e.g. a PayPal webhook arriving during a user click) never overwrite each other.
+let writeQueue: Promise<unknown> = Promise.resolve()
+
+function withLock<T>(fn: () => Promise<T>): Promise<T> {
+  const next = writeQueue.then(fn, fn)
+  writeQueue = next.then(
+    () => undefined,
+    () => undefined,
+  )
+  return next
+}
+
 export async function listProjects(): Promise<Project[]> {
   return (await db().getItem<Project[]>('projects')) ?? []
 }
 
 export async function saveProjects(projects: Project[]) {
-  await db().setItem('projects', projects)
+  await withLock(() => db().setItem('projects', projects))
 }
 
 export async function getProject(id: string): Promise<Project> {
@@ -24,12 +37,14 @@ export async function getProject(id: string): Promise<Project> {
 }
 
 export async function upsertProject(project: Project) {
-  const projects = await listProjects()
-  const i = projects.findIndex((p) => p.id === project.id)
-  if (i === -1) projects.unshift(project)
-  else projects[i] = project
-  await saveProjects(projects)
-  return project
+  return withLock(async () => {
+    const projects = await listProjects()
+    const i = projects.findIndex((p) => p.id === project.id)
+    if (i === -1) projects.unshift(project)
+    else projects[i] = project
+    await db().setItem('projects', projects)
+    return project
+  })
 }
 
 export function findMilestone(project: Project, milestoneId: string): Milestone {
@@ -49,10 +64,12 @@ export async function findByInvoiceId(invoiceId: string) {
 
 /** Demo reset: forget every project and activity entry. PayPal's invoices are not touched. */
 export async function clearAll() {
-  const counts = { projects: (await listProjects()).length, activity: (await listActivity()).length }
-  await db().removeItem('projects')
-  await db().removeItem('activity')
-  return counts
+  return withLock(async () => {
+    const counts = { projects: (await listProjects()).length, activity: (await listActivity()).length }
+    await db().removeItem('projects')
+    await db().removeItem('activity')
+    return counts
+  })
 }
 
 export async function listActivity(): Promise<ActivityEntry[]> {
@@ -60,7 +77,9 @@ export async function listActivity(): Promise<ActivityEntry[]> {
 }
 
 export async function logActivity(actor: Actor, text: string, projectId?: string) {
-  const entries = await listActivity()
-  entries.unshift({ id: newId(), at: new Date().toISOString(), actor, text, projectId })
-  await db().setItem('activity', entries.slice(0, 200))
+  await withLock(async () => {
+    const entries = await listActivity()
+    entries.unshift({ id: newId(), at: new Date().toISOString(), actor, text, projectId })
+    await db().setItem('activity', entries.slice(0, 200))
+  })
 }

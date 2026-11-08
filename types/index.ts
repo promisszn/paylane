@@ -15,10 +15,29 @@ export type MilestoneTrigger = 'upfront' | 'on_completion'
  */
 export type MilestoneStatus = 'planned' | 'draft' | 'sent' | 'paid' | 'cancelled'
 
+export type ReminderTone = 'friendly' | 'clear' | 'firm'
+
+export interface IntakeAttachment {
+  name: string
+  /** MIME type, e.g. image/png, image/jpeg, image/webp, application/pdf */
+  mediaType: string
+  /** Base64-encoded payload (without data:...;base64, prefix) */
+  data: string
+}
+
+export interface CurrencySummary {
+  currency: string
+  outstanding: number
+  overdue: number
+  paid: number
+  pipeline: number
+}
+
 export interface Reminder {
   sentAt: string
   subject: string
   note: string
+  tone?: ReminderTone
 }
 
 export interface Milestone {
@@ -92,6 +111,7 @@ export interface NextAction {
   milestoneId: string
   title: string
   detail: string
+  tone?: ReminderTone
 }
 
 /** One row in the receivables grid. */

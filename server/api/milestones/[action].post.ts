@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ReminderTone } from '../../../types'
 
 /**
  * Every per-milestone action, one endpoint per verb:
@@ -29,7 +30,7 @@ export default defineEventHandler(async (event) => {
   const input = await readValidatedBody(event, body.parse)
   const project = await getProject(input.projectId)
   const milestone = findMilestone(project, input.milestoneId)
-  let reminderDraft: { subject: string; note: string } | undefined
+  let reminderDraft: { subject: string; note: string; tone: ReminderTone } | undefined
 
   switch (action) {
     case 'draft': {
@@ -65,9 +66,10 @@ export default defineEventHandler(async (event) => {
     case 'remind': {
       assertStatus(milestone.status, ['sent'], 'remind about')
       if (!input.subject || !input.note) throw createError({ statusCode: 400, statusMessage: 'Reminder subject and note are required.' })
+      const tone = reminderTone(daysOverdue(milestone), milestone.reminders.length)
       await remindInvoice(milestone.invoiceId!, input.subject, input.note)
-      milestone.reminders.push({ sentAt: new Date().toISOString(), subject: input.subject, note: input.note })
-      await logActivity('you', `Sent reminder #${milestone.reminders.length} for ${milestone.invoiceNumber} to ${project.client.name}.`, project.id)
+      milestone.reminders.push({ sentAt: new Date().toISOString(), subject: input.subject, note: input.note, tone })
+      await logActivity('you', `Sent reminder #${milestone.reminders.length} (${tone}) for ${milestone.invoiceNumber} to ${project.client.name}.`, project.id)
       break
     }
 

@@ -138,12 +138,14 @@ export function nextActions(projects: Project[]): NextAction[] {
         const lastNudge = m.reminders.at(-1)?.sentAt ?? m.sentAt
         const quietDays = lastNudge ? (now - new Date(lastNudge).getTime()) / DAY : Infinity
         if (late > 0 && quietDays >= 3) {
+          const tone = reminderTone(late, m.reminders.length)
           actions.push({
             kind: 'remind',
             projectId: p.id,
             milestoneId: m.id,
             title: `Remind ${p.client.name} about ${m.invoiceNumber}`,
             detail: `${fmt(m.amount, p.currency)} is ${late} day${late === 1 ? '' : 's'} overdue${m.reminders.length ? `, ${m.reminders.length} reminder(s) sent` : ''}.`,
+            tone,
           })
         }
       }
