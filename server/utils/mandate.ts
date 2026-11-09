@@ -10,8 +10,9 @@
  *   2  up to N extra days, once per invoice
  *   3  split into up to N installments
  *   4  only on invoices up to an amount, in your default currency
- * Never, whatever the mandate says: change a total, discount, cancel, or agree to new work.
- * There is simply no tool for those.
+ * Never on a client's word, whatever the mandate says: change an amount, discount, cancel, or
+ * agree to new work. The client page agent simply has no tool for those. An amount only changes
+ * when you agree to it in your own reply (followThrough.ts) or change it from the ledger.
  */
 import type { Clause, Mandate, Milestone, Project, ReminderTone } from '../../types'
 

@@ -110,8 +110,8 @@ async function sign() {
     </ol>
 
     <p class="mandate__never">
-      <strong>Never, whatever it's told:</strong> change a total, give a discount, cancel an invoice or agree to new work.
-      The agent has no tool that can.
+      <strong>Never on a client's word:</strong> change an amount, give a discount, cancel an invoice or agree to new work.
+      The agent on the client page has no tool that can. It only changes an amount when you agree to it in your own reply.
     </p>
 
     <footer class="mandate__foot">

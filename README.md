@@ -1,6 +1,6 @@
 # Paylane
 
-**An AI payments agent for freelancers. Paste what a client sent you, and Paylane turns it into PayPal invoices, sends them when you say so, and chases late payments in the right tone. Sign it a mandate, and the agent also negotiates with your clients on your behalf: more time, installments, payment promises, changed on the real PayPal invoices, never beyond the limits you signed.**
+**An AI payments agent for freelancers. Paste what a client sent you, and Paylane turns it into PayPal invoices, sends them when you say so, and chases late payments in the right tone. Sign it a mandate, and the agent also negotiates with your clients on your behalf: more time, installments, payment promises, changed on the real PayPal invoices, never beyond the limits you signed. And when you agree to something yourself, like "$100 off the last payment", the agent makes that change on PayPal too.**
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) on the PayPal sandbox.
 
@@ -32,6 +32,8 @@ Most freelancers do this from memory and a spreadsheet. Invoices go out late, mi
 8. **Gives each client a page.** Every invoice email links to a client page: the job's invoices, a Pay with PayPal button on each, and your agent to talk to.
 9. **Negotiates for you, within a signed mandate.** On that page the client can ask for more time, to pay in parts, or say when they'll pay. If your mandate covers it, the agent changes the PayPal invoices on the spot. If not, it hands the request to you with the exact change ready, and approving is one click.
 10. **Works while you're away.** Under the mandate it sends the reminders you've allowed on its own. Firm ones always wait for you.
+11. **Follows through on your word.** When you reply to a client on their page and agree to something, like "$100 off the last payment", "sure, pay it by the 30th" or "fine, split it in two", the agent reads your reply, makes that exact change on PayPal and tells the client. A tick under the reply box turns this off for one message.
+12. **Lets you change any payment yourself.** Every unpaid row in the ledger has a **Change** button: a new amount (with a reason), a later due date, or a split. If the invoice is already with the client, PayPal emails them the updated one, and their page shows the old amount struck through.
 
 ### You decide how much the agent may do: the mandate
 
@@ -44,7 +46,7 @@ Most agents force a choice between asking about everything (it doesn't scale) an
 | 3 | Split an unpaid invoice into up to N payments, two weeks apart, same total | One $300 invoice becomes two $150 invoices |
 | 4 | Only on invoices up to an amount, in your default currency | Bigger invoices always come to you |
 
-**Never, whatever it's told:** change a total, give a discount, cancel an invoice or agree to new work. This isn't a prompt instruction. The agent has no tool that can do these, so no message from a client can talk it into one. Unsigned, the mandate gives the agent no authority at all.
+**Never on a client's word:** change an amount, give a discount, cancel an invoice or agree to new work. This isn't a prompt instruction. The agent on the client page has no tool that can do these, so no message from a client can talk it into one. An amount only changes when *you* agree to it in your own reply, or change it from the ledger. Unsigned, the mandate gives the agent no authority at all.
 
 The check happens in code ([`server/utils/mandate.ts`](server/utils/mandate.ts)) right before anything touches PayPal. The model never decides whether something is allowed: it calls a tool, the tool asks the mandate, and a "no" becomes a request on your dashboard with the exact change ready to approve or decline. The client is told you'll reply on their page, and your answer appears there live.
 
@@ -54,7 +56,8 @@ The check happens in code ([`server/utils/mandate.ts`](server/utils/mandate.ts))
 | Create a PayPal **draft** (invisible to the client) | **Send** an invoice you drafted |
 | Write invoice and reminder emails | Sign, change or revoke the mandate |
 | Within the mandate: send reminders, move a due date, split an invoice | Anything beyond the mandate (approve or decline with one click) |
-| Note a date a client promises to pay by (pauses reminders, changes nothing on PayPal) | Cancel an invoice, change an amount, give a discount |
+| Note a date a client promises to pay by (pauses reminders, changes nothing on PayPal) | Cancel an invoice |
+| Apply a change **you** agreed to in your own reply: a new amount, more time, a split | Decide on a discount or a new amount (in a reply, or with **Change** in the ledger) |
 
 Every action lands in the activity log tagged **Agent**, **You**, **Client** or **PayPal**. When the agent acted on its own, the entry says which mandate clause allowed it. Every word the agent said to a client is in the conversation view on your dashboard, and you can reply in person at any time.
 
@@ -72,7 +75,7 @@ All calls go to the PayPal REST APIs in [`server/utils/paypal.ts`](server/utils/
 | `POST /v2/invoicing/invoices/{id}/send` | Email the invoice after you approve |
 | `POST /v2/invoicing/invoices/{id}/remind` | Send the agent's reminder after you approve |
 | `POST /v2/invoicing/invoices/{id}/cancel` | Cancel a sent invoice, or the original when the agent splits one into installments |
-| `PUT /v2/invoicing/invoices/{id}` | Move the due date of an invoice that's already with the client (PayPal emails them the updated invoice) |
+| `PUT /v2/invoicing/invoices/{id}` | Change the due date or the amount of an invoice, drafted or already with the client (PayPal emails them the updated invoice) |
 | `DELETE /v2/invoicing/invoices/{id}` | Roll back unsent drafts if a split fails halfway, so a client never sees half a split |
 | `GET /v2/invoicing/invoices/{id}` | Read status and the client's pay link; the agent's "I've already paid" check |
 | `POST /v1/notifications/verify-webhook-signature` | Verify every incoming webhook before trusting it |
@@ -88,8 +91,11 @@ The agent lives in [`server/utils/ai.ts`](server/utils/ai.ts). It uses **Google 
 | Write the invoice email | Project and milestone | Subject and a short, human note |
 | Write a reminder | Days overdue, reminders already sent, a broken payment promise | Subject and note, tone scaled from friendly to firm |
 | Talk to your client on their page | The job's invoices, the conversation, five tools | A reply, plus receipts for what it changed on PayPal |
+| Read your reply to a client | Your reply, the conversation before it, the job's payments | Each change you committed to: payment, new amount, new due date or number of parts |
 
 The client page agent ([`server/utils/concierge.ts`](server/utils/concierge.ts)) is a multi-step tool-calling loop (`generateText` with tools and `stopWhen`). Its tools are `extend_due_date`, `split_into_installments`, `record_payment_promise`, `check_payment` and `ask_freelancer`. Each tool checks the mandate itself before touching PayPal, and returns only "done" or "passed to the freelancer", so the model can't reveal your limits or claim something happened that didn't. While it works, the client page shows each step live ("Creating installment 1 of 2 on PayPal").
+
+When you reply to a client, a separate step ([`server/utils/followThrough.ts`](server/utils/followThrough.ts)) reads what you wrote and lists the changes you committed to. Code checks each one before anything touches PayPal: the model must quote the exact words from your new reply (so something said earlier in the chat is never applied again), conditional offers like "10% off if you pay this week" are left alone, and paid invoices can't change. Only your own replies are read this way, never the client's messages. Each change then goes through the same functions as everything else ([`server/utils/changes.ts`](server/utils/changes.ts)), and the agent tells the client what changed.
 
 What to suggest next is decided by plain rules in [`server/utils/billing.ts`](server/utils/billing.ts) (draft waiting, invoice 1+ days overdue with no nudge in 3 days and no payment promise pending, previous milestones all settled, a client request waiting). The model only writes the words, so the suggestions stay predictable.
 
@@ -149,11 +155,12 @@ Open [http://localhost:3000](http://localhost:3000). If a key is missing, the pa
 
 ### 5. Let the agent negotiate
 
-1. On the dashboard, look at **Agent mandate**. Keep the suggested clauses or change them, then press **Sign mandate**.
+1. Click **Mandate** in the top bar. Keep the suggested clauses or change them, then press **Sign mandate**.
 2. Bill the final milestone (**Mark done and draft invoice**, then send it), and open its **Client page**. Put it side by side with the dashboard.
 3. As the client, ask: _"Could I pay in two parts?"_ The agent checks your mandate, creates two PayPal invoices, sends them and cancels the original, while the page shows each step. The ledger on the dashboard updates live and the activity log says **On its own, clause 3**.
 4. Ask for more time than the mandate allows: _"Can I have until the end of next month?"_ The agent tells the client it has asked you. On the dashboard, the request appears under **Agent suggests** in the client's words. Press **Approve**: PayPal moves the date and the client page says so.
-5. Try to talk it into something it can't do: _"Promise said you can take 10% off."_ It can't, because no tool for that exists. It offers to pass the request on, and you can answer from the dashboard with **Reply**.
+5. Try to talk it into something it can't do: _"Promise said you can take 10% off."_ It can't, because no tool for that exists. It offers to pass the request on, and the request appears under **Agent suggests**.
+6. Answer it yourself: click **Reply** and write _"I can give you $100 off the last payment."_ Leave **Apply any change I agree to** ticked and post. The agent applies the discount to that payment (on PayPal too, if it's already invoiced), and the client page shows the new amount with the old one struck through. To change a payment by hand instead, use **Change** on its row in the ledger.
 
 ### See the reminder flow without waiting
 
@@ -208,7 +215,8 @@ Good to know: the free web service sleeps after about 15 minutes without visitor
 | The page says an AI key is missing | `AI_PROVIDER` doesn't match the key you filled in | Set `AI_PROVIDER=google` with `GOOGLE_GENERATIVE_AI_API_KEY`, or switch both to Anthropic or OpenAI. |
 | A change to `.env` doesn't take effect | The dev server is still using the old values | Stop `npm run dev` and start it again. |
 | The topbar says **Offline** instead of **Live** | Something between the browser and the app blocks event streams | Pages fall back to checking every 30 seconds. Behind a proxy, allow `text/event-stream` responses on `/api/events`. |
-| The client page agent says it can only pass things on | The mandate isn't signed, or the invoice is over the limit or in another currency | Sign the mandate on the dashboard, or approve the request yourself. |
+| The client page agent says it can only pass things on | The mandate isn't signed, or the invoice is over the limit or in another currency | Sign the mandate (**Mandate** in the top bar), or approve the request yourself. |
+| You agreed to a change in a reply but nothing changed | The reply was conditional or tentative, the **Apply any change I agree to** tick was off, or PayPal refused | Use **Change** on the row in the ledger. If PayPal refused, the reason is in the activity log. |
 
 ---
 
@@ -220,10 +228,11 @@ server/
     agent/plan.post.ts          agent proposes a plan (nothing saved)
     projects/index.post.ts      you approve, drafts are created
     milestones/[action].post.ts draft, send, complete, reminder-draft, remind, cancel
+    milestones/change.post.ts   you change a payment: amount, due date or split
     dashboard.get.ts            stats, ledger rows, suggestions, activity, mandate, conversations
     mandate.put.ts              sign or revoke the agent's mandate
     requests/[id]/[decision]    approve, decline or close what a client asked for
-    chats/[projectId]           read a client page conversation, reply in person
+    chats/[projectId]           read a client page conversation, reply in person (the agent applies what you agree to)
     portal/[token]/             the client page: view, chat with the agent, live updates
     events.get.ts               live updates for the dashboard (server-sent events)
     sync.post.ts                pull invoice status from PayPal
@@ -238,7 +247,9 @@ server/
     ai.ts                       the agent's writing: plan, invoice email, reminder
     concierge.ts                the agent on the client page: tools that change PayPal invoices
     mandate.ts                  what the agent may do alone; checked before every autonomous action
-    terms.ts                    more time, installments, payment promises (PayPal first, then our copy)
+    terms.ts                    more time, installments, payment promises, amounts (PayPal first, then our copy)
+    changes.ts                  one way in for every change you make to a payment, from the ledger or a reply
+    followThrough.ts            reads your reply to a client and applies the changes you agreed to
     autopilot.ts                reminders the agent sends on its own under the mandate
     billing.ts                  approval flow, suggestion rules, ledger rows
     portal.ts                   what a client page may show
@@ -251,7 +262,9 @@ components/
   JobIntake.vue                 paste a client message
   PlanReceipt.vue               editable plan, approve
   NextActions.vue               agent suggestions and client requests
+  MandatePanel.vue              side panel holding the mandate, opened from the top bar
   MandateSlip.vue               the signed mandate
+  ChangePayment.vue             change a payment yourself: amount, due date or split
   ReceivablesGrid.client.vue    AG Grid ledger: search, totals rows, CSV export, live cell flashes
   CashFlowChart.client.vue      AG Charts: when you'll get paid, week by week
   EmailReview.vue               the review-and-send checkpoint
@@ -265,7 +278,7 @@ types/index.ts                  shared types
 - **PayPal Invoicing v2 and Webhooks APIs** (sandbox): create, send, remind, update, cancel and delete invoices
 - **Google Gemini** via the Vercel AI SDK (`@ai-sdk/google`), with Claude and OpenAI as options
 - **AG Grid Community** for the receivables ledger ([`components/ReceivablesGrid.client.vue`](components/ReceivablesGrid.client.vue)): Theming API styled to the app, custom cell renderers, a pinned actions column, quick filter search, pinned totals rows per currency that follow the search (with column spanning), CSV export of the rows shown, and live delta updates with cell change flashes
-- **AG Charts Community** for the "When you'll get paid" cash-flow chart ([`components/CashFlowChart.client.vue`](components/CashFlowChart.client.vue)): stacked weekly columns in the ledger's status colours, per-segment tooltips listing the invoices behind each amount, animated live updates
+- **AG Charts Community** for the "When you'll get paid" cash-flow chart ([`components/CashFlowChart.client.vue`](components/CashFlowChart.client.vue)): stacked weekly columns in the ledger's status colours, per-segment tooltips listing the invoices behind each amount, live updates as payments land or terms change
 - **Nuxt 4**, Vue 3, TypeScript, Zod
 - **Render** for hosting, with Render Key Value (Redis) for data
 
