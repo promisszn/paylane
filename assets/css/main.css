@@ -19,6 +19,8 @@
 
   --font-ui: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-money: 'Spline Sans Mono', ui-monospace, monospace;
+  /* Only for the signature on the mandate. */
+  --font-sign: 'Mrs Saint Delafield', 'Brush Script MT', cursive;
 
   /* Type scale (1.2 minor third) */
   --t-xs: 0.8125rem;
@@ -218,6 +220,50 @@ p {
 .stamp--cancelled {
   color: var(--ink-faint);
   text-decoration: line-through;
+}
+.stamp--split {
+  color: var(--ink-soft);
+  border-style: dashed;
+}
+.stamp--promised {
+  color: var(--carbon);
+  border-style: dashed;
+}
+
+/*
+ * What the agent did in a chat turn, printed under its reply like a line on a carbon copy.
+ * Used on the client page and in the dashboard's conversation view.
+ */
+.receipt-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px dashed var(--rule);
+  border-radius: 4px;
+  background: var(--paper-pure);
+  font: 500 0.75rem / 1.4 var(--font-money);
+  letter-spacing: -0.01em;
+  color: var(--ink-soft);
+}
+.receipt-line::before {
+  content: '';
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--carbon);
+  transform: translateY(-1px);
+}
+.receipt-line[data-kind='checked']::before,
+.receipt-line[data-kind='approved']::before {
+  background: var(--paid);
+}
+.receipt-line[data-kind='escalated']::before {
+  background: var(--draft);
+}
+.receipt-line[data-kind='declined']::before {
+  background: var(--ink-faint);
 }
 
 .visually-hidden {

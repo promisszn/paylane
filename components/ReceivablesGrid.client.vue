@@ -3,6 +3,7 @@
  * Every billable milestone across every job, in AG Grid.
  * Actions live in the last column and route through the same review dialogs
  * as the suggestions, so the human checkpoint is identical everywhere.
+ * Rows update live (server-sent events); cells the agent or PayPal change flash briefly.
  */
 import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry, themeQuartz, type CellClickedEvent, type ColDef } from 'ag-grid-community'
@@ -27,9 +28,15 @@ const theme = themeQuartz.withParams({
   wrapperBorderRadius: 3,
   rowHeight: 52,
   headerHeight: 44,
+  // The flash when a payment lands or the agent changes terms on a client page.
+  valueChangeValueHighlightBackgroundColor: '#e0f1e8',
 })
 
+const dayMonth = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+
 function statusLabel(r: ReceivableRow) {
+  if (r.status === 'cancelled' && r.splitInto) return { text: `Split in ${r.splitInto}`, cls: 'split' }
+  if (r.status === 'sent' && r.promiseDate) return { text: `Promised ${dayMonth(r.promiseDate)}`, cls: 'promised' }
   if (r.status === 'sent' && r.daysOverdue > 0) return { text: `${r.daysOverdue}d overdue`, cls: 'overdue' }
   const text: Record<ReceivableRow['status'], string> = {
     planned: r.trigger === 'upfront' ? 'Not drafted' : 'Bill when done',
@@ -49,8 +56,10 @@ function actionsFor(r: ReceivableRow): Array<[string, string]> {
       return [['send', 'Send'], ['cancel', 'Cancel']]
     case 'sent':
       return demo.value
-        ? [['remind', 'Remind'], ['pay', 'Pay link'], ['overdue', 'Backdate']]
-        : [['remind', 'Remind'], ['pay', 'Pay link']]
+        ? [['remind', 'Remind'], ['page', 'Client page'], ['overdue', 'Backdate']]
+        : [['remind', 'Remind'], ['page', 'Client page']]
+    case 'paid':
+      return r.clientPage ? [['page', 'Client page']] : []
     default:
       return []
   }
@@ -58,14 +67,15 @@ function actionsFor(r: ReceivableRow): Array<[string, string]> {
 
 const columnDefs: ColDef<ReceivableRow>[] = [
   // Client names are short, job names are the longest text, so Job gets the most room.
-  // Fixed columns are sized to their content so the whole grid fits 1160px even in demo mode.
-  { field: 'client', headerName: 'Client', minWidth: 80, flex: 0.8, tooltipField: 'client' },
-  { field: 'project', headerName: 'Job', minWidth: 170, flex: 1.6, tooltipField: 'project' },
-  { field: 'milestone', headerName: 'Milestone', minWidth: 128, flex: 1.2, tooltipField: 'milestone' },
+  // Fixed columns are sized to their content so the whole grid fits 1160px even in demo mode
+  // (flex minimums 70 + 140 + 140 plus fixed widths 761 = 1111).
+  { field: 'client', headerName: 'Client', minWidth: 70, flex: 0.7, tooltipField: 'client' },
+  { field: 'project', headerName: 'Job', minWidth: 140, flex: 1.4, tooltipField: 'project' },
+  { field: 'milestone', headerName: 'Milestone', minWidth: 140, flex: 1.5, tooltipField: 'milestone' },
   {
     field: 'amount',
     headerName: 'Amount',
-    width: 115,
+    width: 105,
     type: 'rightAligned',
     cellClass: 'money',
     valueFormatter: (p) => (p.data ? formatMoney(p.value, p.data.currency) : ''),
@@ -73,28 +83,33 @@ const columnDefs: ColDef<ReceivableRow>[] = [
   {
     colId: 'status',
     headerName: 'Status',
-    width: 140,
+    width: 128,
     // The label is the cell value, so the grid redraws when only daysOverdue changes (e.g. "2d" -> "10d overdue").
     valueGetter: (p) => (p.data ? statusLabel(p.data).text : ''),
+    enableCellChangeFlash: true,
     cellRenderer: (p: { data: ReceivableRow }) => {
       const s = statusLabel(p.data)
       return `<span class="stamp stamp--${s.cls}">${s.text}</span>`
     },
     comparator: (_a, _b, na, nb) => (na.data?.daysOverdue ?? 0) - (nb.data?.daysOverdue ?? 0),
   },
-  { field: 'invoiceNumber', headerName: 'Invoice', width: 85, valueFormatter: (p) => p.value ?? '' },
+  { field: 'invoiceNumber', headerName: 'Invoice', width: 72, valueFormatter: (p) => p.value ?? '' },
   {
     field: 'dueDate',
     headerName: 'Due',
-    width: 85,
-    valueFormatter: (p) => (p.value ? new Date(`${p.value}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''),
+    width: 100,
+    enableCellChangeFlash: true,
+    // "+6" marks extra days the client was given after the invoice went out.
+    valueGetter: (p) => (p.data?.dueDate ? `${dayMonth(p.data.dueDate)}${p.data.extendedDays ? ` +${p.data.extendedDays}d` : ''}` : ''),
+    tooltipValueGetter: (p) => (p.data?.extendedDays ? `${p.data.extendedDays} extra days given after it was sent` : undefined),
+    comparator: (_a, _b, na, nb) => (na.data?.dueDate ?? '').localeCompare(nb.data?.dueDate ?? ''),
   },
-  { field: 'reminders', headerName: 'Nudges', width: 85, type: 'rightAligned', valueFormatter: (p) => (p.value ? String(p.value) : '') },
+  { field: 'reminders', headerName: 'Nudges', width: 76, type: 'rightAligned', valueFormatter: (p) => (p.value ? String(p.value) : '') },
   {
     colId: 'actions',
     headerName: '',
     // Room for the extra demo button. Status is loaded before this client-only grid mounts.
-    width: demo.value ? 268 : 180,
+    width: demo.value ? 280 : 200,
     pinned: 'right',
     sortable: false,
     cellRenderer: (p: { data: ReceivableRow }) =>
@@ -113,12 +128,15 @@ function runAction(action: string, r: ReceivableRow) {
   else if (action === 'remind') reviewReminder(r.projectId, r.milestoneId)
   else if (action === 'cancel') cancelMilestone(r.projectId, r.milestoneId)
   else if (action === 'overdue') makeOverdue(r.projectId, r.milestoneId, r.daysOverdue)
-  else if (action === 'pay' && r.payerUrl) window.open(r.payerUrl, '_blank', 'noopener')
+  else if (action === 'page' && r.clientPage) window.open(r.clientPage, '_blank', 'noopener')
 }
 
 function formatDueDate(iso: string | null) {
-  return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''
+  return iso ? dayMonth(iso) : ''
 }
+
+// Replaced invoices stay in the ledger for the record, quietly.
+const rowClassRules = { 'row--replaced': (p: { data?: ReceivableRow }) => Boolean(p.data?.splitInto) }
 
 function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
   const action = (e.event?.target as HTMLElement | null)?.closest<HTMLElement>('[data-action]')?.dataset.action
@@ -139,6 +157,9 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
       :get-row-id="(p: { data: ReceivableRow }) => p.data.milestoneId"
       :dom-layout="'autoHeight'"
       :tooltip-show-mode="'whenTruncated'"
+      :row-class-rules="rowClassRules"
+      :cell-flash-duration="900"
+      :cell-fade-duration="1200"
       :overlay-no-rows-template="'<span>Approved jobs show up here, one row per payment.</span>'"
       @cell-clicked="onCellClicked"
     />
@@ -149,7 +170,7 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
         Approved jobs show up here, one row per payment.
       </p>
       <ul v-else class="receivables__cards">
-        <li v-for="r in data?.rows" :key="r.milestoneId" class="rcard">
+        <li v-for="r in data?.rows" :key="r.milestoneId" class="rcard" :class="{ 'rcard--replaced': r.splitInto }">
           <div class="rcard__top">
             <div>
               <p class="rcard__milestone">{{ r.milestone }}</p>
@@ -161,7 +182,7 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
           <div class="rcard__meta">
             <span class="stamp" :class="`stamp--${statusLabel(r).cls}`">{{ statusLabel(r).text }}</span>
             <span v-if="r.invoiceNumber" class="rcard__tag">#{{ r.invoiceNumber }}</span>
-            <span v-if="r.dueDate" class="rcard__tag">Due {{ formatDueDate(r.dueDate) }}</span>
+            <span v-if="r.dueDate" class="rcard__tag">Due {{ formatDueDate(r.dueDate) }}<template v-if="r.extendedDays"> (+{{ r.extendedDays }}d)</template></span>
             <span v-if="r.reminders" class="rcard__tag">{{ r.reminders }} nudge{{ r.reminders === 1 ? '' : 's' }}</span>
           </div>
 
@@ -223,6 +244,10 @@ function onCellClicked(e: CellClickedEvent<ReceivableRow>) {
 }
 .grid-action[data-action='cancel'] {
   color: var(--ink-faint);
+}
+.grid .row--replaced .ag-cell:not([col-id='actions']),
+.rcard--replaced {
+  opacity: 0.55;
 }
 .receivables__mobile {
   display: none;

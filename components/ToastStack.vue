@@ -131,6 +131,13 @@ function style(index: number, id: number) {
 .toast[data-tone='error'] {
   border-color: var(--overdue-soft);
 }
+/* Something the agent did on its own, or a client asked for: carbon blue, like the agent's label. */
+.toast[data-tone='agent'] .toast__dot {
+  background: var(--carbon);
+}
+.toast[data-tone='agent'] {
+  border-color: var(--carbon-soft);
+}
 
 /* Enter from above, exit by fading up. Exit is faster than enter. */
 .toast-enter-from {

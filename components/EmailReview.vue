@@ -56,6 +56,10 @@ const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
         <span class="field__label">Message</span>
         <textarea v-model="note" class="textarea" rows="7" required />
       </label>
+      <p v-if="shown.footer" class="review__footer">
+        <span class="review__footer-label">Added below your message</span>
+        {{ shown.footer }}
+      </p>
 
       <p class="review__fine">
         {{ shown.mode === 'reminder' ? 'PayPal sends this as a reminder on the existing invoice.' : 'PayPal emails the invoice with a pay button. The client can pay with PayPal or a card.' }}
@@ -175,6 +179,20 @@ const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
 }
 .review__fine {
   font-size: var(--t-xs);
+  color: var(--ink-faint);
+}
+.review__footer {
+  margin-top: -0.4rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-control);
+  font-size: var(--t-xs);
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.review__footer-label {
+  display: block;
+  font-size: 0.72rem;
   color: var(--ink-faint);
 }
 .review__actions {

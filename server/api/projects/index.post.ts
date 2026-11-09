@@ -43,6 +43,7 @@ export default defineEventHandler(async (event) => {
     sourceMessage,
     createdAt: new Date().toISOString(),
     milestones: plan.milestones.map((m) => ({ ...m, id: newId(), status: 'planned', reminders: [] })),
+    portalToken: newToken(),
   }
 
   await upsertProject(project)

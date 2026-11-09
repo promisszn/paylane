@@ -24,6 +24,10 @@ const empty = computed(() => !s.value || (!s.value.outstanding && !s.value.paid 
       <template v-if="s.pipeline"><span class="money">{{ m(s.pipeline) }}</span> still to bill on active jobs.</template>
     </p>
 
+    <p v-if="s?.handledAlone" class="status__agent">
+      Your agent handled {{ s.handledAlone }} {{ s.handledAlone === 1 ? 'thing' : 'things' }} on its own this week, each one within your mandate.
+    </p>
+
     <p v-for="o in others" :key="o.currency" class="status__sub status__sub--other">
       Also in {{ o.currency }}:
       <template v-if="o.outstanding"><span class="money">{{ m(o.outstanding, o.currency) }}</span> owed<template v-if="o.overdue"> (<span class="money">{{ m(o.overdue, o.currency) }}</span> overdue)</template>. </template>
@@ -55,5 +59,15 @@ const empty = computed(() => !s.value || (!s.value.outstanding && !s.value.paid 
   margin-top: 0.6rem;
   color: var(--ink-soft);
   font-size: var(--t-md);
+}
+.status__agent {
+  margin-top: 0.6rem;
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--carbon-soft);
+  color: var(--carbon);
+  font-size: var(--t-xs);
+  font-weight: 600;
 }
 </style>

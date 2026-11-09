@@ -1,8 +1,10 @@
 import type {
   ActivityEntry,
   AppStatus,
+  ChatTurn,
   CurrencySummary,
   IntakeAttachment,
+  Mandate,
   NextAction,
   Project,
   ProjectPlan,
@@ -10,12 +12,24 @@ import type {
   ReminderTone,
 } from '~/types'
 
+export interface ConversationSummary {
+  projectId: string
+  client: string
+  project: string
+  count: number
+  lastAt: string
+  lastRole: ChatTurn['role']
+  lastText: string
+}
+
 export interface DashboardData {
   projects: Project[]
   rows: ReceivableRow[]
   actions: NextAction[]
   activity: ActivityEntry[]
-  stats: CurrencySummary & { otherCurrencies?: CurrencySummary[] }
+  mandate: Mandate
+  conversations: ConversationSummary[]
+  stats: CurrencySummary & { otherCurrencies?: CurrencySummary[]; handledAlone: number }
 }
 
 /** The email the user reviews before anything is sent. */
@@ -28,12 +42,24 @@ export interface PendingEmail {
   subject: string
   note: string
   tone?: ReminderTone
+  /** The line Paylane adds below the note, pointing the client at their page. */
+  footer?: string
+}
+
+/** A client page conversation open in the dialog, optionally answering one request. */
+export interface OpenConversation {
+  projectId: string
+  client: string
+  project: string
+  clientPage: string | null
+  turns: ChatTurn[]
+  requestId?: string
 }
 
 export interface Toast {
   id: number
   text: string
-  tone: 'ok' | 'error'
+  tone: 'ok' | 'error' | 'agent'
 }
 
 export function errorText(err: any) {
@@ -50,8 +76,15 @@ export function useDashboard() {
   const plan = useState<ProjectPlan | null>('plan', () => null)
   const sourceMessage = useState('sourceMessage', () => '')
   const pendingEmail = useState<PendingEmail | null>('pendingEmail', () => null)
+  const conversation = useState<OpenConversation | null>('conversation', () => null)
   const toasts = useState<Toast[]>('toasts', () => [])
   const busy = useState<string | null>('busy', () => null)
+  /** What the agent is doing on a client page right now, for the live line on the dashboard. */
+  const agentProgress = useState<{ text: string; client: string; at: number } | null>('agentProgress', () => null)
+  /** Milestones that just turned paid, so the ledger and stamps can mark the moment. */
+  const justPaid = useState<string[]>('justPaid', () => [])
+  /** What's been announced already, so a live refresh and a click racing each other toast once. */
+  const announced = useState<string[]>('announced', () => [])
 
   function dismiss(id: number) {
     toasts.value = toasts.value.filter((t) => t.id !== id)
@@ -61,11 +94,37 @@ export function useDashboard() {
   function notify(text: string, tone: Toast['tone'] = 'ok') {
     const id = Date.now() + Math.random()
     toasts.value = [{ id, text, tone }, ...toasts.value].slice(0, 3)
-    setTimeout(() => dismiss(id), tone === 'error' ? 7000 : 4500)
+    setTimeout(() => dismiss(id), tone === 'error' ? 7000 : tone === 'agent' ? 6500 : 4500)
   }
 
-  async function refresh() {
-    data.value = await $fetch<DashboardData>('/api/dashboard')
+  /**
+   * Re-fetch everything. With `announce`, also tell the user about what changed without them:
+   * payments that landed and things the agent did on its own or was asked by a client.
+   */
+  async function refresh(announce = false) {
+    const before = data.value
+    const next = await $fetch<DashboardData>('/api/dashboard')
+    data.value = next
+    if (!announce || !before) return
+
+    const done = new Set(announced.value)
+    const fresh = (key: string) => !done.has(key) && Boolean(done.add(key))
+
+    const wasPaid = new Set(before.rows.filter((r) => r.status === 'paid').map((r) => r.milestoneId))
+    const paidNow = next.rows.filter((r) => r.status === 'paid' && !wasPaid.has(r.milestoneId) && fresh(`paid:${r.milestoneId}`))
+    for (const r of paidNow) notify(`${r.client} paid ${formatMoney(r.amount, r.currency)} for invoice ${r.invoiceNumber ?? r.milestone}.`)
+    if (paidNow.length) {
+      justPaid.value = paidNow.map((r) => r.milestoneId)
+      setTimeout(() => (justPaid.value = []), 2500)
+    }
+
+    const seen = new Set(before.activity.map((e) => e.id))
+    for (const e of next.activity.filter((x) => !seen.has(x.id)).reverse()) {
+      if (!fresh(`activity:${e.id}`)) continue
+      if (e.actor === 'agent' && e.clause) notify(`On its own: ${e.text}`, 'agent')
+      else if (e.actor === 'client') notify(e.text.replace(/ The agent passed it to you\.$/, ' Waiting for you in Agent suggests.'), 'agent')
+    }
+    announced.value = [...done].slice(-300)
   }
 
   async function loadStatus() {
@@ -85,6 +144,11 @@ export function useDashboard() {
   }
 
   const findProject = (id: string) => data.value?.projects.find((p) => p.id === id)
+
+  function clientPageLine(project: Project) {
+    if (!project.portalToken || !status.value) return undefined
+    return `Questions, or need more time to pay? Ask my assistant: ${status.value.publicUrl}/pay/${project.portalToken}`
+  }
 
   async function planJob(message: string, attachment?: IntakeAttachment) {
     const res = await run('plan', () =>
@@ -141,6 +205,7 @@ export function useDashboard() {
       to: `${project.client.name} <${project.client.email}>`,
       subject: milestone.draftSubject ?? '',
       note: milestone.draftNote ?? '',
+      footer: clientPageLine(project),
     }
   }
 
@@ -155,6 +220,7 @@ export function useDashboard() {
       heading: `Remind ${project.client.name} about ${res.milestone.invoiceNumber}`,
       to: `${project.client.name} <${project.client.email}>`,
       ...res.reminderDraft,
+      footer: clientPageLine(project),
     }
   }
 
@@ -193,8 +259,70 @@ export function useDashboard() {
   async function syncPayPal() {
     const res = await run('sync', () => $fetch<{ checked: number; newlyPaid: string[] }>('/api/sync', { method: 'POST' }))
     if (!res) return
+    // New payments are announced by the refresh itself (once, even if the live update got there first).
+    await refresh(true)
+    if (!res.newlyPaid.length) notify(`Checked ${res.checked} invoice${res.checked === 1 ? '' : 's'}. No new payments.`)
+  }
+
+  // ---------------------------------------------------------------------------
+  // The mandate, client requests and client page conversations
+  // ---------------------------------------------------------------------------
+
+  async function signMandate(terms: Pick<Mandate, 'reminders' | 'extensionDays' | 'installments' | 'limit'>) {
+    const res = await run('mandate', () => $fetch<{ mandate: Mandate }>('/api/mandate', { method: 'PUT', body: { action: 'sign', ...terms } }))
+    if (!res) return false
     await refresh()
-    notify(res.newlyPaid.length ? `Paid: ${res.newlyPaid.join(', ')}` : `Checked ${res.checked} invoice${res.checked === 1 ? '' : 's'}. No new payments.`)
+    notify('Mandate signed. The agent can now act within it, and asks you about everything else.')
+    return true
+  }
+
+  async function revokeMandate() {
+    const res = await run('mandate', () => $fetch<{ mandate: Mandate }>('/api/mandate', { method: 'PUT', body: { action: 'revoke' } }))
+    if (!res) return
+    await refresh()
+    notify('Mandate revoked. The agent asks you before everything again.')
+  }
+
+  async function decideRequest(requestId: string, decision: 'approve' | 'decline' | 'handled') {
+    const res = await run(`request:${requestId}`, () =>
+      // A plain string URL keeps Nitro's route typing from recursing on the template literal.
+      $fetch<{ ok: boolean }>(`/api/requests/${requestId}/${decision}` as string, { method: 'POST' }),
+    )
+    if (res === undefined) return
+    await refresh()
+    notify(
+      decision === 'approve'
+        ? 'Approved. PayPal has the new terms, and the agent told your client.'
+        : decision === 'decline'
+          ? 'Declined. The agent told your client the current terms stand.'
+          : 'Marked as handled.',
+    )
+  }
+
+  async function openConversation(projectId: string, requestId?: string) {
+    const res = await run(`chat:${projectId}`, () => $fetch<Omit<OpenConversation, 'requestId'>>(`/api/chats/${projectId}`))
+    if (res) conversation.value = { ...res, requestId }
+  }
+
+  /** Re-read the open conversation, e.g. when the client writes while you're reading. */
+  async function reloadConversation() {
+    const open = conversation.value
+    if (!open) return
+    const res = await $fetch<Omit<OpenConversation, 'requestId'>>(`/api/chats/${open.projectId}`).catch(() => null)
+    if (res && conversation.value?.projectId === open.projectId) conversation.value = { ...res, requestId: conversation.value.requestId }
+  }
+
+  async function sendReply(text: string) {
+    const open = conversation.value
+    if (!open) return false
+    const res = await run('reply', () =>
+      $fetch<{ turn: unknown }>(`/api/chats/${open.projectId}` as string, { method: 'POST', body: { text, requestId: open.requestId } }),
+    )
+    if (res === undefined) return false
+    conversation.value = { ...open, requestId: undefined }
+    await Promise.all([reloadConversation(), refresh()])
+    notify(`Reply posted on ${open.client}'s page.`)
+    return true
   }
 
   return {
@@ -202,9 +330,12 @@ export function useDashboard() {
     status,
     plan,
     pendingEmail,
+    conversation,
     toasts,
     dismiss,
     busy,
+    agentProgress,
+    justPaid,
     refresh,
     loadStatus,
     planJob,
@@ -215,6 +346,13 @@ export function useDashboard() {
     cancelMilestone,
     makeOverdue,
     syncPayPal,
+    signMandate,
+    revokeMandate,
+    decideRequest,
+    openConversation,
+    reloadConversation,
+    sendReply,
     notify,
   }
 }
+

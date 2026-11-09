@@ -37,6 +37,11 @@ export function aiInfo() {
   return { provider, model: ai.model || DEFAULT_MODELS[provider], ready: Boolean(key), key }
 }
 
+/** The configured chat model, shared with the client page agent (concierge.ts). */
+export function agentModel() {
+  return model()
+}
+
 function model() {
   const info = aiInfo()
   if (!info.ready) {
@@ -160,6 +165,7 @@ export async function draftInvoiceEmail(project: Project, milestone: Milestone) 
       `You write invoice emails for ${freelancer.name} (${freelancer.business}), a freelancer.`,
       'Tone: warm, direct, professional. Sound like a real person, not a company.',
       'Mention what the payment is for and the due date. Do not mention AI. Sign off with the freelancer\'s first name.',
+      'Do not include any links; a link to the client page is added below your note automatically.',
     ].join('\n'),
     JSON.stringify({
       client: project.client.name,
@@ -209,6 +215,8 @@ export async function draftReminder(project: Project, milestone: Milestone, days
       '- clear: polite but direct. Restate the amount and invoice number. The subject names the invoice number and says it is overdue; do not call it friendly.',
       '- firm: calm and firm. Ask for a specific payment date and say further work is paused until it is settled. The subject says the payment is overdue; do not call it friendly or gentle.',
       'Use the "dueState" field as the only truth about timing. Never say the invoice is due today or late unless dueState says so; if it is not due yet, say it is a gentle heads-up with the due date.',
+      'If "promisedToPayBy" is set, the client promised to pay by that date and it has passed: mention it once, kindly, without blame.',
+      'Do not include any links; one is added below your note automatically.',
       'Never threaten, never guilt-trip, no ALL CAPS. Plain text. Sign off with the freelancer\'s first name.',
     ].join('\n'),
     JSON.stringify({
@@ -223,6 +231,7 @@ export async function draftReminder(project: Project, milestone: Milestone, days
       tone,
       daysOverdue,
       previousReminders: previous,
+      promisedToPayBy: milestone.promise?.date ?? null,
     }),
   )
   return { ...draft, tone }

@@ -67,8 +67,10 @@ export default defineEventHandler(async (event) => {
       assertStatus(milestone.status, ['sent'], 'remind about')
       if (!input.subject || !input.note) throw createError({ statusCode: 400, statusMessage: 'Reminder subject and note are required.' })
       const tone = reminderTone(daysOverdue(milestone), milestone.reminders.length)
-      await remindInvoice(milestone.invoiceId!, input.subject, input.note)
-      milestone.reminders.push({ sentAt: new Date().toISOString(), subject: input.subject, note: input.note, tone })
+      const note = withClientPageLink(input.note, project)
+      await remindInvoice(milestone.invoiceId!, input.subject, note)
+      milestone.reminders.push({ sentAt: new Date().toISOString(), subject: input.subject, note, tone, by: 'you' })
+      delete milestone.autoRemindError
       await logActivity('you', `Sent reminder #${milestone.reminders.length} (${tone}) for ${milestone.invoiceNumber} to ${project.client.name}.`, project.id)
       break
     }

@@ -2,7 +2,7 @@
  * PayPal webhook receiver. Subscribe your sandbox app to:
  *   INVOICING.INVOICE.PAID, INVOICING.INVOICE.CANCELLED, INVOICING.INVOICE.UPDATED
  * and put the webhook id in PAYPAL_WEBHOOK_ID. Every event is verified with PayPal
- * before we trust it.
+ * before we trust it. Open dashboards and client pages update the moment it lands.
  */
 export default defineEventHandler(async (event) => {
   const payload = await readBody<{ event_type?: string; resource?: any }>(event)
@@ -20,9 +20,9 @@ export default defineEventHandler(async (event) => {
   // Don't trust the payload's copy. Fetch the invoice so we always store PayPal's current state.
   const { project, milestone } = match
   const invoice = await getInvoice(invoiceId)
-  if (applyInvoiceState(milestone, invoice)) {
+  const { result: justPaid } = await mutateProject(project.id, (p) => applyInvoiceState(findMilestone(p, milestone.id), invoice))
+  if (justPaid) {
     await logActivity('paypal', `${project.client.name} paid ${milestone.invoiceNumber}: ${fmt(milestone.amount, project.currency)} for "${milestone.name}".`, project.id)
   }
-  await upsertProject(project)
   return { ok: true }
 })

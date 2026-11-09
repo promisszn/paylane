@@ -56,7 +56,7 @@ function paypalError(err: any, fallback: string) {
   return createError({ statusCode: err?.statusCode ?? 502, statusMessage: `PayPal: ${message}` })
 }
 
-async function pp<T>(path: string, opts: { method?: 'GET' | 'POST'; body?: unknown; headers?: Record<string, string> } = {}) {
+async function pp<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown; headers?: Record<string, string> } = {}) {
   const { base } = config()
   const token = await getAccessToken()
   return $fetch<T>(`${base}${path}`, {
@@ -96,14 +96,17 @@ function splitName(full: string) {
   return { given_name: parts[0] ?? full, surname: parts.slice(1).join(' ') || undefined }
 }
 
-/** Create a DRAFT invoice for one milestone. Nothing is emailed until sendInvoice(). */
-export async function createDraftInvoice(project: Project, milestone: Milestone, note: string) {
+/**
+ * Create a DRAFT invoice for one milestone. Nothing is emailed until sendInvoice().
+ * `dueDate` (YYYY-MM-DD) overrides the usual "today + dueDays", e.g. for installments.
+ */
+export async function createDraftInvoice(project: Project, milestone: Milestone, note: string, dueDate?: string) {
   const { freelancer } = useRuntimeConfig()
   const { invoice_number } = await pp<{ invoice_number: string }>('/v2/invoicing/generate-next-invoice-number', {
     method: 'POST',
   })
 
-  const due = new Date(Date.now() + milestone.dueDays * 86_400_000)
+  const due = dueDate ? new Date(`${dueDate}T00:00:00Z`) : new Date(Date.now() + milestone.dueDays * 86_400_000)
 
   return pp<PayPalInvoice>('/v2/invoicing/invoices', {
     method: 'POST',
@@ -162,11 +165,30 @@ export async function remindInvoice(invoiceId: string, subject: string, note: st
   })
 }
 
-export async function cancelInvoice(invoiceId: string, note: string) {
+export async function cancelInvoice(invoiceId: string, note: string, notifyClient = true) {
   await pp(`/v2/invoicing/invoices/${invoiceId}/cancel`, {
     method: 'POST',
-    body: { subject: 'Invoice cancelled', note, send_to_recipient: true, send_to_invoicer: false },
+    body: { subject: 'Invoice cancelled', note: note.slice(0, 4000), send_to_recipient: notifyClient, send_to_invoicer: false },
   })
+}
+
+/**
+ * Move the due date of an invoice that's already with the client.
+ * Invoicing v2 has no partial update, so this reads the full invoice, changes the date and
+ * PUTs it back. PayPal then emails the client the updated invoice. The pay link stays the same.
+ */
+export async function updateInvoiceDueDate(invoiceId: string, dueDate: string, notifyClient = true) {
+  const invoice = await pp<PayPalInvoice & { detail: { payment_term?: Record<string, unknown> } }>(`/v2/invoicing/invoices/${invoiceId}`)
+  invoice.detail.payment_term = { ...invoice.detail.payment_term, term_type: 'DUE_ON_DATE_SPECIFIED', due_date: dueDate }
+  return pp<PayPalInvoice>(
+    `/v2/invoicing/invoices/${invoiceId}?send_to_recipient=${notifyClient}&send_to_invoicer=false`,
+    { method: 'PUT', body: invoice, headers: { Prefer: 'return=representation' } },
+  )
+}
+
+/** Delete a draft that never reached the client (used to roll back a half-finished split). */
+export async function deleteDraftInvoice(invoiceId: string) {
+  await pp(`/v2/invoicing/invoices/${invoiceId}`, { method: 'DELETE' })
 }
 
 /** PayPal statuses that mean the money arrived. */

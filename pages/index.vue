@@ -1,16 +1,34 @@
 <script setup lang="ts">
-const { status, plan, busy, refresh, loadStatus, syncPayPal } = useDashboard()
+const { status, plan, busy, data, agentProgress, conversation, refresh, reloadConversation, loadStatus, syncPayPal } = useDashboard()
 
 await Promise.all([refresh(), loadStatus()])
 
-// Pick up payments while the tab is open (webhooks cover this when deployed).
+// Live: payments, client page conversations and the agent's own actions arrive as they happen.
+let progressTimer: ReturnType<typeof setTimeout> | undefined
+const { connected } = useLive('/api/events', {
+  onChange: () => {
+    refresh(true)
+    if (conversation.value) reloadConversation()
+  },
+  onProgress: (text, projectId) => {
+    const client = data.value?.projects.find((p) => p.id === projectId)?.client.name ?? 'a client'
+    agentProgress.value = { text, client, at: Date.now() }
+    clearTimeout(progressTimer)
+    progressTimer = setTimeout(() => (agentProgress.value = null), 6000)
+  },
+})
+
+// Fallback if the live connection is blocked (some proxies strip event streams).
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   timer = setInterval(() => {
-    if (document.visibilityState === 'visible') refresh()
+    if (!connected.value && document.visibilityState === 'visible') refresh(true)
   }, 30_000)
 })
-onBeforeUnmount(() => clearInterval(timer))
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  clearTimeout(progressTimer)
+})
 </script>
 
 <template>
@@ -21,9 +39,14 @@ onBeforeUnmount(() => clearInterval(timer))
         <span class="brand__name">Paylane</span>
         <span v-if="status" class="brand__env">{{ status.freelancer.business }}<template v-if="status.paypalEnv === 'sandbox'">, PayPal sandbox</template></span>
       </div>
-      <button class="btn btn--quiet btn--small" :disabled="busy === 'sync'" @click="syncPayPal">
-        {{ busy === 'sync' ? 'Checking PayPal…' : 'Check for payments' }}
-      </button>
+      <div class="topbar__right">
+        <span class="live" :data-on="connected" :title="connected ? 'Updates arrive as they happen' : 'Reconnecting…'">
+          <span class="live__dot" aria-hidden="true" />{{ connected ? 'Live' : 'Offline' }}
+        </span>
+        <button class="btn btn--quiet btn--small" :disabled="busy === 'sync'" @click="syncPayPal">
+          {{ busy === 'sync' ? 'Checking PayPal…' : 'Check for payments' }}
+        </button>
+      </div>
     </header>
 
     <main class="main">
@@ -37,6 +60,7 @@ onBeforeUnmount(() => clearInterval(timer))
         </div>
         <div class="desk__right">
           <NextActions />
+          <MandateSlip />
         </div>
       </div>
 
@@ -48,10 +72,14 @@ onBeforeUnmount(() => clearInterval(timer))
         </ClientOnly>
       </section>
 
-      <ActivityLog class="main__log" />
+      <div class="records">
+        <ActivityLog />
+        <ClientConversations />
+      </div>
     </main>
 
     <EmailReview />
+    <ConversationDialog />
 
     <ToastStack />
   </div>
@@ -68,6 +96,11 @@ onBeforeUnmount(() => clearInterval(timer))
   gap: 1rem;
   padding: 1rem clamp(1rem, 4vw, 2.5rem);
   border-bottom: 1px solid var(--rule);
+}
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
 }
 .brand {
   display: flex;
@@ -93,6 +126,26 @@ onBeforeUnmount(() => clearInterval(timer))
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--t-xs);
+  color: var(--ink-faint);
+}
+.live__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  transition: background-color var(--dur-enter) var(--ease-out);
+}
+.live[data-on='true'] {
+  color: var(--paid);
+}
+.live[data-on='true'] .live__dot {
+  background: var(--paid);
+}
 .main {
   max-width: 1240px;
   margin: 0 auto;
@@ -106,6 +159,10 @@ onBeforeUnmount(() => clearInterval(timer))
   gap: 2rem;
   align-items: start;
 }
+.desk__right {
+  display: grid;
+  gap: 1.75rem;
+}
 .ledger__title {
   font-size: var(--t-lg);
   margin-bottom: 0.9rem;
@@ -113,8 +170,15 @@ onBeforeUnmount(() => clearInterval(timer))
 .ledger__loading {
   color: var(--ink-faint);
 }
+.records {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+  gap: 2rem;
+  align-items: start;
+}
 @media (max-width: 900px) {
-  .desk {
+  .desk,
+  .records {
     grid-template-columns: 1fr;
   }
 }
