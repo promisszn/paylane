@@ -55,22 +55,23 @@ const ago = (iso: string) => {
   gap: 0.2rem;
   text-align: left;
   padding: 0.7rem 0.85rem;
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-control);
+  border: 0;
+  border-radius: 12px;
   background: var(--paper-pure);
+  box-shadow: var(--shadow-sheet);
   color: var(--ink);
   font: var(--t-xs) / 1.45 var(--font-ui);
   cursor: pointer;
   transition:
     transform var(--dur-press) var(--ease-out),
-    border-color var(--dur-press) var(--ease-out);
+    background-color var(--dur-press) var(--ease-out);
 }
 .talk__item:active {
   transform: scale(0.99);
 }
 @media (hover: hover) and (pointer: fine) {
   .talk__item:hover {
-    border-color: var(--carbon);
+    background: #fbfbfd;
   }
 }
 .talk__top {

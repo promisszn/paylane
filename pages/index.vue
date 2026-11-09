@@ -1,5 +1,8 @@
 <script setup lang="ts">
-const { status, plan, busy, data, agentProgress, conversation, refresh, reloadConversation, loadStatus, syncPayPal } = useDashboard()
+const { status, plan, busy, data, agentProgress, conversation, mandateOpen, refresh, reloadConversation, loadStatus, syncPayPal } = useDashboard()
+
+/** The mandate's state for the top bar. Unsigned is the one that asks for attention. */
+const mandateSigned = computed(() => Boolean(data.value?.mandate.signedAt))
 
 await Promise.all([refresh(), loadStatus()])
 
@@ -40,11 +43,23 @@ onBeforeUnmount(() => {
         <span v-if="status" class="brand__env">{{ status.freelancer.business }}<template v-if="status.paypalEnv === 'sandbox'">, PayPal sandbox</template></span>
       </div>
       <div class="topbar__right">
+        <button
+          v-if="data"
+          type="button"
+          class="mandate-chip"
+          :data-signed="mandateSigned"
+          aria-haspopup="dialog"
+          :title="mandateSigned ? 'What the agent may do on its own' : 'The agent asks you before everything until you sign'"
+          @click="mandateOpen = true"
+        >
+          <span class="mandate-chip__dot" aria-hidden="true" />
+          <span>Mandate<span class="mandate-chip__state">{{ mandateSigned ? ': in force' : ': not signed' }}</span></span>
+        </button>
         <span class="live" :data-on="connected" :title="connected ? 'Updates arrive as they happen' : 'Reconnecting…'">
           <span class="live__dot" aria-hidden="true" />{{ connected ? 'Live' : 'Offline' }}
         </span>
-        <button class="btn btn--quiet btn--small" :disabled="busy === 'sync'" @click="syncPayPal">
-          {{ busy === 'sync' ? 'Checking PayPal…' : 'Check for payments' }}
+        <button class="btn btn--quiet btn--small" :disabled="busy === 'sync'" :data-loading="busy === 'sync'" :aria-busy="busy === 'sync'" @click="syncPayPal">
+          Check for payments
         </button>
       </div>
     </header>
@@ -60,7 +75,6 @@ onBeforeUnmount(() => {
         </div>
         <div class="desk__right">
           <NextActions />
-          <MandateSlip />
         </div>
       </div>
 
@@ -87,6 +101,7 @@ onBeforeUnmount(() => {
     <EmailReview />
     <ConversationDialog />
     <ChangePayment />
+    <MandatePanel />
 
     <ToastStack />
   </div>
@@ -97,12 +112,26 @@ onBeforeUnmount(() => {
   min-height: 100vh;
 }
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 1rem clamp(1rem, 4vw, 2.5rem);
-  border-bottom: 1px solid var(--rule);
+  padding: 0.75rem clamp(1rem, 4vw, 2.5rem);
+  /* A translucent bar: content scrolls under it instead of behind an opaque strip. */
+  background: rgb(245 245 247 / 0.78);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgb(0 0 0 / 0.06);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .topbar {
+    background: var(--desk);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 .topbar__right {
   display: flex;
@@ -118,13 +147,14 @@ onBeforeUnmount(() => {
 .brand__mark {
   width: 1.1rem;
   height: 1.35rem;
-  background: var(--carbon);
+  /* The original brand blue, same as the favicon. */
+  background: #2747c9;
   clip-path: polygon(0 0, 100% 0, 100% 100%, 83% 88%, 66% 100%, 50% 88%, 33% 100%, 17% 88%, 0 100%);
 }
 .brand__name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--t-md);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 .brand__env {
   color: var(--ink-faint);
@@ -132,6 +162,45 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* The way into the mandate panel: its state at a glance, the details one click away. */
+.mandate-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-pure);
+  color: var(--ink);
+  font: 500 var(--t-xs) / 1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-press) var(--ease-out);
+}
+.mandate-chip:active {
+  transform: scale(0.97);
+}
+@media (hover: hover) and (pointer: fine) {
+  .mandate-chip:hover {
+    background: var(--paper);
+  }
+}
+.mandate-chip__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--draft);
+}
+.mandate-chip[data-signed='true'] .mandate-chip__dot {
+  background: var(--paid);
+}
+.mandate-chip__state {
+  color: var(--ink-soft);
 }
 .live {
   display: inline-flex;
@@ -190,7 +259,8 @@ onBeforeUnmount(() => {
   }
 }
 @media (max-width: 520px) {
-  .brand__env {
+  .brand__env,
+  .mandate-chip__state {
     display: none;
   }
 }

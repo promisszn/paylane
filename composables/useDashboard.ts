@@ -131,6 +131,8 @@ export function useDashboard() {
   const pendingEmail = useState<PendingEmail | null>('pendingEmail', () => null)
   const conversation = useState<OpenConversation | null>('conversation', () => null)
   const changing = useState<ChangingPayment | null>('changing', () => null)
+  /** The mandate panel, opened from the top bar, a suggestion or a clause tag in the activity log. */
+  const mandateOpen = useState('mandateOpen', () => false)
   const toasts = useState<Toast[]>('toasts', () => [])
   const busy = useState<string | null>('busy', () => null)
   /** What the agent is doing on a client page right now, for the live line on the dashboard. */
@@ -426,6 +428,7 @@ export function useDashboard() {
     pendingEmail,
     conversation,
     changing,
+    mandateOpen,
     toasts,
     dismiss,
     busy,

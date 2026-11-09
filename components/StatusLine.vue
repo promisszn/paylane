@@ -41,15 +41,13 @@ const empty = computed(() => !s.value || (!s.value.outstanding && !s.value.paid 
 .status__line {
   font-size: clamp(var(--t-xl), 3.4vw, var(--t-2xl));
   font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
   max-width: 30ch;
 }
 .status__figure {
-  /* Same face as the sentence, tabular figures. Mono is too heavy at headline size. */
-  font-family: var(--font-ui);
+  /* Same face as the sentence, tabular figures. Only a late amount gets colour. */
   font-variant-numeric: tabular-nums;
-  color: var(--carbon);
   font-weight: 600;
 }
 .status__figure--late {
@@ -68,6 +66,6 @@ const empty = computed(() => !s.value || (!s.value.outstanding && !s.value.paid 
   background: var(--carbon-soft);
   color: var(--carbon);
   font-size: var(--t-xs);
-  font-weight: 600;
+  font-weight: 500;
 }
 </style>

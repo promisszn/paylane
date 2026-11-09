@@ -106,13 +106,13 @@ function style(index: number, id: number) {
   width: 100%;
   min-height: 56px;
   padding: 0.85rem 1rem;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 12px;
   background: var(--paper-pure);
   color: var(--ink);
   text-align: left;
   font: var(--t-sm) / 1.4 var(--font-ui);
-  box-shadow: 0 10px 30px -12px rgb(22 35 63 / 0.35);
+  box-shadow: var(--shadow-dialog);
   transform-origin: top center;
   touch-action: none;
   cursor: grab;
@@ -135,15 +135,9 @@ function style(index: number, id: number) {
 .toast[data-tone='error'] .toast__dot {
   background: var(--overdue);
 }
-.toast[data-tone='error'] {
-  border-color: var(--overdue-soft);
-}
-/* Something the agent did on its own, or a client asked for: carbon blue, like the agent's label. */
+/* Something the agent did on its own, or a client asked for. */
 .toast[data-tone='agent'] .toast__dot {
   background: var(--carbon);
-}
-.toast[data-tone='agent'] {
-  border-color: var(--carbon-soft);
 }
 
 /* Enter from above, exit by fading up. Exit is faster than enter. */

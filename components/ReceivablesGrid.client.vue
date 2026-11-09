@@ -28,7 +28,7 @@ import type { ReceivableRow } from '~/types'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
-const { data, status, reviewInvoice, reviewReminder, cancelMilestone, makeOverdue, openChange } = useDashboard()
+const { data, status, busy, reviewInvoice, reviewReminder, cancelMilestone, makeOverdue, openChange } = useDashboard()
 const demo = computed(() => Boolean(status.value?.demoMode))
 
 /** What the totals row adds up, per currency, over the rows the search leaves. */
@@ -42,22 +42,26 @@ interface Totals {
 /** A ledger row, or (pinned at the bottom) a totals row carrying `totals`. */
 type LedgerRow = ReceivableRow & { totals?: Totals }
 
+// Same tokens as assets/css/main.css; the grid's theme takes plain values.
 const theme = themeQuartz.withParams({
-  fontFamily: 'Schibsted Grotesk, sans-serif',
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif",
   fontSize: 14,
-  foregroundColor: '#16233f',
+  foregroundColor: '#1d1d1f',
   backgroundColor: '#ffffff',
-  headerBackgroundColor: '#f7f8fa',
-  headerFontWeight: 600,
-  headerTextColor: '#4a5672',
-  borderColor: '#e1e6ed',
-  rowHoverColor: '#f2f5fd',
-  accentColor: '#2747c9',
-  wrapperBorderRadius: 3,
+  headerBackgroundColor: '#ffffff',
+  headerFontWeight: 500,
+  headerTextColor: '#6e6e73',
+  borderColor: '#e8e8ed',
+  rowHoverColor: '#fafafc',
+  accentColor: '#0066cc',
+  wrapperBorderRadius: 14,
+  columnBorder: false,
+  headerColumnBorder: false,
+  headerColumnResizeHandleColor: 'transparent',
   rowHeight: 52,
   headerHeight: 44,
   // The flash when a payment lands or the agent changes terms on a client page.
-  valueChangeValueHighlightBackgroundColor: '#e0f1e8',
+  valueChangeValueHighlightBackgroundColor: '#e7f4eb',
 })
 
 const dayMonth = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
@@ -93,6 +97,19 @@ function actionsFor(r: ReceivableRow): Array<[string, string]> {
       return []
   }
 }
+
+/** The busy key each ledger action runs under (see useDashboard), so its button can show a spinner. */
+function busyKeyFor(action: string, r: ReceivableRow) {
+  if (action === 'draft' || action === 'send') return `draft:${r.milestoneId}`
+  if (action === 'done') return `complete:${r.milestoneId}`
+  if (action === 'remind') return `reminder-draft:${r.milestoneId}`
+  if (action === 'cancel') return `cancel:${r.milestoneId}`
+  if (action === 'overdue') return 'demo'
+  return null
+}
+const isLoading = (action: string, r: ReceivableRow) => busy.value !== null && busy.value === busyKeyFor(action, r)
+/** While one of a row's actions runs, the row's other buttons wait. */
+const rowBusy = (r: ReceivableRow) => actionsFor(r).some(([key]) => isLoading(key, r))
 
 // --- The totals row ---------------------------------------------------------------------------
 
@@ -253,10 +270,15 @@ const columnDefs: ColDef<LedgerRow>[] = [
       !p.data || isTotal(p)
         ? ''
         : actionsFor(p.data)
-            .map(
-              ([key, label]) =>
-                `<button type="button" class="grid-action" data-action="${key}"${key === 'overdue' ? ' title="Demo mode: make this invoice more overdue"' : ''}>${label}</button>`,
-            )
+            .map(([key, label]) => {
+              const loading = isLoading(key, p.data!)
+              const attrs = [
+                loading ? ' data-loading="true" aria-busy="true"' : '',
+                rowBusy(p.data!) ? ' disabled' : '',
+                key === 'overdue' ? ' title="Demo mode: make this invoice more overdue"' : '',
+              ].join('')
+              return `<button type="button" class="grid-action" data-action="${key}"${attrs}>${label}</button>`
+            })
             .join(''),
   },
   // Not shown, but exported: what an accountant needs next to each amount.
@@ -347,6 +369,9 @@ function formatDueDate(iso: string | null) {
   return iso ? dayMonth(iso) : ''
 }
 
+// The action cells are plain HTML, so redraw them when something starts or stops running.
+watch(busy, () => api.value?.refreshCells({ columns: ['actions'], force: true }))
+
 const rowClassRules = {
   // Replaced invoices stay in the ledger for the record, quietly.
   'row--replaced': (p: RowClassParams<LedgerRow>) => Boolean(p.data?.splitInto),
@@ -354,9 +379,10 @@ const rowClassRules = {
 }
 
 function onCellClicked(e: CellClickedEvent<LedgerRow>) {
-  const action = (e.event?.target as HTMLElement | null)?.closest<HTMLElement>('[data-action]')?.dataset.action
+  const button = (e.event?.target as HTMLElement | null)?.closest<HTMLButtonElement>('[data-action]')
+  const action = button?.dataset.action
   const r = e.data
-  if (!action || !r || isTotal(e)) return
+  if (!action || !r || isTotal(e) || button?.disabled) return
   runAction(action, r)
 }
 </script>
@@ -441,6 +467,8 @@ function onCellClicked(e: CellClickedEvent<LedgerRow>) {
               type="button"
               class="grid-action"
               :data-action="key"
+              :data-loading="isLoading(key, r)" :aria-busy="isLoading(key, r)"
+              :disabled="rowBusy(r)"
               @click="runAction(key, r)"
             >
               {{ label }}
@@ -509,9 +537,14 @@ function onCellClicked(e: CellClickedEvent<LedgerRow>) {
   padding-top: 0.4rem;
   padding-bottom: 0.4rem;
 }
-/* The totals row: a double rule above it, like the total line on the plan receipt. */
+/* The totals row: set apart by a firmer rule. */
 .grid .ag-floating-bottom {
-  border-top: 3px double var(--ink) !important;
+  border-top: 1px solid var(--rule) !important;
+}
+/* The ledger sits on the page like every other card. */
+.grid .ag-root-wrapper {
+  border: 0;
+  box-shadow: var(--shadow-sheet);
 }
 .grid .row--total {
   background: var(--paper);
@@ -545,9 +578,9 @@ function onCellClicked(e: CellClickedEvent<LedgerRow>) {
 }
 .ledger-total__part::before {
   content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   background: var(--carbon);
 }
 .ledger-total__part--paid::before {
@@ -557,11 +590,14 @@ function onCellClicked(e: CellClickedEvent<LedgerRow>) {
   background: var(--overdue);
 }
 .grid-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   border: 1px solid var(--rule);
   background: var(--paper-pure);
   color: var(--ink);
-  border-radius: 5px;
-  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  padding: 0.22rem 0.65rem;
   margin-right: 0.35rem;
   font: 500 var(--t-xs) / 1.4 var(--font-ui);
   cursor: pointer;
@@ -569,22 +605,25 @@ function onCellClicked(e: CellClickedEvent<LedgerRow>) {
 .grid-action {
   transition:
     transform var(--dur-press) var(--ease-out),
-    border-color var(--dur-press) var(--ease-out),
-    color var(--dur-press) var(--ease-out);
+    background-color var(--dur-press) var(--ease-out);
 }
 .grid-action:active {
   transform: scale(0.97);
 }
 @media (hover: hover) and (pointer: fine) {
   .grid-action:hover {
-    border-color: var(--carbon);
-    color: var(--carbon);
+    background: var(--paper);
   }
 }
-/* Demo-only control: dashed so it never reads as a real money action. */
+/* Demo-only control: borderless and quieter, so it never reads as a real money action. */
 .grid-action[data-action='overdue'] {
-  border-style: dashed;
+  border-color: transparent;
+  background: var(--paper);
   color: var(--ink-soft);
+}
+.grid-action:disabled:not([data-loading='true']) {
+  opacity: 0.45;
+  cursor: default;
 }
 .grid-action[data-action='cancel'] {
   color: var(--ink-faint);
@@ -599,7 +638,7 @@ function onCellClicked(e: CellClickedEvent<LedgerRow>) {
 .receivables__empty {
   padding: 1.5rem;
   background: var(--paper-pure);
-  border: 1px solid var(--rule-soft);
+  box-shadow: var(--shadow-sheet);
   border-radius: var(--radius-sheet);
   color: var(--ink-soft);
 }
@@ -612,15 +651,14 @@ function onCellClicked(e: CellClickedEvent<LedgerRow>) {
 }
 .rcard {
   background: var(--paper-pure);
-  border: 1px solid var(--rule-soft);
+  box-shadow: var(--shadow-sheet);
   border-radius: var(--radius-sheet);
   padding: 1rem;
   display: grid;
   gap: 0.65rem;
 }
 .rcard--total {
-  background: var(--paper);
-  border-top: 3px double var(--ink);
+  background: var(--paper-pure);
 }
 .rcard__top {
   display: flex;
@@ -650,16 +688,16 @@ function onCellClicked(e: CellClickedEvent<LedgerRow>) {
   color: var(--ink-soft);
 }
 .rcard__tag {
-  padding: 0.1rem 0.45rem;
+  padding: 0.1rem 0.5rem;
   background: var(--paper);
-  border-radius: 4px;
+  border-radius: 999px;
 }
 .rcard__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   padding-top: 0.4rem;
-  border-top: 1px dashed var(--rule-soft);
+  border-top: 1px solid var(--rule-soft);
 }
 .rcard__actions .grid-action {
   margin-right: 0;

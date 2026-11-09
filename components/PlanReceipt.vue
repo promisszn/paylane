@@ -107,8 +107,8 @@ function approve() {
       </div>
       <div class="receipt__actions">
         <button type="button" class="btn btn--quiet" @click="plan = null">Discard</button>
-        <button type="button" class="btn" :disabled="!emailValid || busy === 'approve'" @click="approve">
-          {{ busy === 'approve' ? 'Saving and drafting…' : 'Approve plan' }}
+        <button type="button" class="btn" :disabled="!emailValid || busy === 'approve'" :data-loading="busy === 'approve'" :aria-busy="busy === 'approve'" @click="approve">
+          Approve plan
         </button>
       </div>
       <p class="receipt__fine">
@@ -120,18 +120,11 @@ function approve() {
 
 <style scoped>
 .receipt {
-  --edge: 10px;
   position: relative;
   background: var(--paper-pure);
-  padding: 1.75rem 1.5rem 1.5rem;
+  border-radius: var(--radius-sheet);
+  padding: 1.5rem;
   box-shadow: var(--shadow-sheet);
-  /* Zig-zag tear on top and bottom: the one decorative flourish in the app. */
-  -webkit-mask:
-    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--edge) 51% repeat-x,
-    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--edge) 51% repeat-x;
-  mask:
-    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--edge) 51% repeat-x,
-    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--edge) 51% repeat-x;
   /* Appears in answer to "Plan payments": a short, quiet reveal, not a show. */
   animation: receipt-in var(--dur-enter) var(--ease-out);
 }
@@ -153,13 +146,13 @@ function approve() {
 }
 .receipt__from {
   font-size: var(--t-xs);
-  color: var(--carbon);
+  color: var(--ink-soft);
   font-weight: 500;
 }
 .receipt__title-input {
   width: 100%;
   border: 0;
-  border-bottom: 1px dashed transparent;
+  border-bottom: 1px solid transparent;
   background: transparent;
   font: 600 var(--t-xl) / 1.2 var(--font-ui);
   color: var(--ink);
@@ -220,7 +213,7 @@ function approve() {
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem 0;
-  border-top: 2px dashed var(--rule);
+  border-top: 1px solid var(--rule-soft);
 }
 .stub__main {
   flex: 1;
@@ -259,11 +252,11 @@ function approve() {
 .stub__select,
 .stub__days {
   border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--paper);
+  border-radius: 6px;
+  background: var(--paper-pure);
   font: var(--t-xs) var(--font-ui);
   color: var(--ink);
-  padding: 0.2rem 0.35rem;
+  padding: 0.25rem 0.4rem;
 }
 .stub__days {
   width: 3.2rem;
@@ -274,7 +267,11 @@ function approve() {
   color: var(--ink-faint);
   font: var(--t-xs) var(--font-ui);
   cursor: pointer;
-  text-decoration: underline;
+}
+@media (hover: hover) and (pointer: fine) {
+  .stub__remove:hover {
+    color: var(--overdue);
+  }
 }
 .stub__amount {
   display: flex;
@@ -287,8 +284,8 @@ function approve() {
   border-bottom: 1px solid var(--rule);
   background: transparent;
   text-align: right;
-  font-size: var(--t-lg);
-  font-weight: 500;
+  font: 600 var(--t-lg) var(--font-ui);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   padding: 0.1rem 0;
 }
@@ -301,8 +298,8 @@ function approve() {
   color: var(--ink-faint);
 }
 .receipt__add {
-  border: 1px dashed var(--rule);
-  background: transparent;
+  border: 0;
+  background: var(--paper);
   width: 100%;
   padding: 0.55rem;
   border-radius: var(--radius-control);
@@ -312,8 +309,8 @@ function approve() {
 }
 @media (hover: hover) and (pointer: fine) {
   .receipt__add:hover {
-    border-color: var(--carbon);
-    color: var(--carbon);
+    background: var(--rule-soft);
+    color: var(--ink);
   }
 }
 .receipt__add:active,
@@ -323,13 +320,13 @@ function approve() {
 .receipt__add {
   transition:
     transform var(--dur-press) var(--ease-out),
-    border-color var(--dur-press) var(--ease-out),
+    background-color var(--dur-press) var(--ease-out),
     color var(--dur-press) var(--ease-out);
 }
 .receipt__foot {
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 3px double var(--ink);
+  border-top: 1px solid var(--rule);
 }
 .receipt__total {
   display: flex;
@@ -340,6 +337,7 @@ function approve() {
 .receipt__total strong {
   font-size: var(--t-2xl);
   font-weight: 600;
+  letter-spacing: -0.025em;
 }
 .receipt__actions {
   margin-top: 1rem;

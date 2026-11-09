@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { NextAction } from '~/types'
 
-const { data, busy, agentProgress, reviewInvoice, reviewReminder, decideRequest, openConversation } = useDashboard()
+const { data, busy, agentProgress, mandateOpen, reviewInvoice, reviewReminder, decideRequest, openConversation } = useDashboard()
 
 const actions = computed(() => data.value?.actions ?? [])
+/** Until a mandate is signed, signing one is the first thing to do. */
+const askToSign = computed(() => Boolean(data.value) && !data.value!.mandate.signedAt)
 
 const verb: Record<Exclude<NextAction['kind'], 'client_request'>, string> = {
   send_draft: 'Review and send',
@@ -25,6 +27,18 @@ function act(a: NextAction) {
 
 const isBusy = (a: NextAction) =>
   a.requestId ? busy.value === `request:${a.requestId}` : (busy.value?.endsWith(a.milestoneId) ?? false)
+/** Approve and Decline share one busy key, so remember which of the two you pressed. */
+const pressed = ref<'approve' | 'decline' | 'handled' | null>(null)
+function decide(a: NextAction, decision: 'approve' | 'decline' | 'handled') {
+  pressed.value = decision
+  decideRequest(a.requestId!, decision)
+}
+const loading = (a: NextAction, decision: 'approve' | 'decline' | 'handled') => isBusy(a) && pressed.value === decision
+/** A finished suggestion folds away from its own height, so what's below slides up instead of jumping. */
+function holdHeight(el: Element) {
+  const e = el as HTMLElement
+  e.style.height = `${e.offsetHeight}px`
+}
 const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
 </script>
 
@@ -35,14 +49,21 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
       <Transition name="live">
         <p v-if="agentProgress" class="next__live" role="status">
           <span class="next__pulse" aria-hidden="true" />
-          On {{ agentProgress.client }}'s page: {{ agentProgress.text }}
+          <span class="next__live-text" :title="`On ${agentProgress.client}'s page: ${agentProgress.text}`">On {{ agentProgress.client }}'s page: {{ agentProgress.text }}</span>
         </p>
       </Transition>
     </header>
-    <p v-if="!actions.length" class="next__empty">
+    <p v-if="!actions.length && !askToSign" class="next__empty">
       Nothing waiting on you. The agent flags drafts to send, overdue invoices, milestones ready to bill and anything a client asks for that your mandate doesn't cover.
     </p>
-    <TransitionGroup v-else tag="ul" name="next" class="next__list">
+    <TransitionGroup v-else tag="ul" name="next" class="next__list" @before-leave="holdHeight">
+      <li v-if="askToSign" key="mandate" class="next__item" data-kind="mandate">
+        <div class="next__body">
+          <p class="next__item-title">Sign a mandate so the agent can act on its own</p>
+          <p class="next__item-detail">Until you do, it asks you before every reminder, extra day and split.</p>
+        </div>
+        <button type="button" class="btn btn--small" aria-haspopup="dialog" @click="mandateOpen = true">Set up mandate</button>
+      </li>
       <li v-for="a in actions" :key="keyOf(a)" class="next__item" :data-kind="a.kind">
         <div class="next__body">
           <p class="next__item-title">
@@ -60,17 +81,17 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
         </div>
 
         <div v-if="a.kind === 'client_request' && a.requestKind !== 'other'" class="next__buttons">
-          <button class="btn btn--small" :disabled="isBusy(a)" @click="decideRequest(a.requestId!, 'approve')">
-            {{ isBusy(a) ? 'Updating PayPal…' : 'Approve' }}
+          <button class="btn btn--small" :disabled="isBusy(a)" :data-loading="loading(a, 'approve')" :aria-busy="loading(a, 'approve')" @click="decide(a, 'approve')">
+            Approve
           </button>
-          <button class="btn btn--quiet btn--small" :disabled="isBusy(a)" @click="decideRequest(a.requestId!, 'decline')">Decline</button>
+          <button class="btn btn--quiet btn--small" :disabled="isBusy(a)" :data-loading="loading(a, 'decline')" :aria-busy="loading(a, 'decline')" @click="decide(a, 'decline')">Decline</button>
         </div>
         <div v-else-if="a.kind === 'client_request'" class="next__buttons">
           <button class="btn btn--small" @click="openConversation(a.projectId, a.requestId)">Reply</button>
-          <button class="btn btn--quiet btn--small" :disabled="isBusy(a)" @click="decideRequest(a.requestId!, 'handled')">Mark handled</button>
+          <button class="btn btn--quiet btn--small" :disabled="isBusy(a)" :data-loading="loading(a, 'handled')" :aria-busy="loading(a, 'handled')" @click="decide(a, 'handled')">Mark handled</button>
         </div>
-        <button v-else class="btn btn--small" :class="{ 'btn--quiet': a.kind === 'invoice_next' }" :disabled="isBusy(a)" @click="act(a)">
-          {{ isBusy(a) ? 'Agent is writing…' : verb[a.kind] }}
+        <button v-else class="btn btn--small" :class="{ 'btn--quiet': a.kind === 'invoice_next' }" :disabled="isBusy(a)" :data-loading="isBusy(a)" :aria-busy="isBusy(a)" @click="act(a)">
+          {{ verb[a.kind] }}
         </button>
       </li>
     </TransitionGroup>
@@ -78,12 +99,16 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
 </template>
 
 <style scoped>
+/* The live line sits beside the title on one line, so it never pushes the list down. */
 .next__head {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.4rem 1rem;
+  gap: 1rem;
+  min-width: 0;
+}
+.next__title {
+  flex-shrink: 0;
 }
 .next__title {
   font-size: var(--t-lg);
@@ -92,11 +117,18 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+  min-width: 0;
   font-size: var(--t-xs);
   color: var(--carbon);
   font-weight: 500;
 }
+.next__live-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .next__pulse {
+  flex-shrink: 0;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -125,10 +157,14 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
 }
 .next__list {
   list-style: none;
-  margin: 0.9rem 0 0;
+  margin: 0.9rem 0 -0.6rem;
   padding: 0;
-  display: grid;
-  gap: 0.6rem;
+  display: flex;
+  flex-direction: column;
+}
+/* Spacing as a margin (not a gap) so it folds away with a leaving item. */
+.next__list > .next__item {
+  margin-bottom: 0.6rem;
 }
 /* When you act on a suggestion it leaves; the rest slide up so you see what changed. */
 .next-move,
@@ -138,11 +174,12 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
     transform var(--dur-enter) var(--ease-out);
 }
 .next-leave-active {
-  position: absolute;
-  width: 100%;
+  overflow: hidden;
   transition:
     opacity var(--dur-exit) var(--ease-out),
-    transform var(--dur-exit) var(--ease-out);
+    height var(--dur-enter) var(--ease-out),
+    padding var(--dur-enter) var(--ease-out),
+    margin var(--dur-enter) var(--ease-out);
 }
 .next-enter-from {
   opacity: 0;
@@ -150,7 +187,10 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
 }
 .next-leave-to {
   opacity: 0;
-  transform: scale(0.98);
+  height: 0 !important;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0 !important;
 }
 .next__list {
   position: relative;
@@ -160,20 +200,10 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.85rem 1rem;
-  background: var(--paper);
-  border-left: 3px solid var(--carbon);
-  border-radius: 0 var(--radius-control) var(--radius-control) 0;
-}
-.next__item[data-kind='remind'] {
-  border-left-color: var(--overdue);
-}
-.next__item[data-kind='invoice_next'] {
-  border-left-color: var(--paid);
-}
-.next__item[data-kind='client_request'] {
-  border-left-color: var(--draft);
+  padding: 0.9rem 1rem;
   background: var(--paper-pure);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sheet);
 }
 .next__body {
   min-width: 0;
@@ -187,8 +217,8 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
 }
 .next__tone {
   font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.1rem 0.45rem;
+  font-weight: 500;
+  padding: 0.1rem 0.5rem;
   border-radius: 999px;
   background: var(--carbon-soft);
   color: var(--carbon);
@@ -206,12 +236,12 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
   color: var(--draft);
 }
 .next__quote {
-  margin: 0.4rem 0 0;
-  padding-left: 0.65rem;
-  border-left: 2px solid var(--rule);
+  margin: 0.45rem 0 0;
+  padding: 0.45rem 0.65rem;
+  background: var(--paper);
+  border-radius: var(--radius-control);
   color: var(--ink-soft);
   font-size: var(--t-xs);
-  font-style: italic;
   overflow-wrap: anywhere;
 }
 .next__item-detail {
@@ -226,8 +256,12 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
   margin-left: 0.25rem;
   font: inherit;
   color: var(--carbon);
-  text-decoration: underline;
   cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .next__link:hover {
+    text-decoration: underline;
+  }
 }
 .next__buttons {
   display: flex;

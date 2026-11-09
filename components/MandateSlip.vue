@@ -2,7 +2,8 @@
 import type { Mandate } from '~/types'
 
 /**
- * The agent's mandate as a signed slip: four clauses, a hard "never" line and your signature.
+ * The agent's mandate: four clauses, a hard "never" line and your signature.
+ * Shown in the mandate panel (MandatePanel.vue), opened from the top bar.
  * Unsigned, the agent asks before everything. Changing a clause needs signing again.
  */
 const { data, status, busy, signMandate, revokeMandate } = useDashboard()
@@ -36,7 +37,7 @@ const signedOn = computed(() =>
     : '',
 )
 
-// The signature is drawn once, right after you sign. Never on page load.
+// The signed line fades in once, right after you sign. Never on page load.
 const fresh = ref(false)
 async function sign() {
   const ok = await signMandate({ ...terms, limit: Math.max(0, Number(terms.limit) || 0) })
@@ -50,11 +51,9 @@ async function sign() {
 <template>
   <section v-if="stored" class="mandate" :data-state="inForce ? 'signed' : signed ? 'changed' : 'unsigned'" aria-labelledby="mandate-heading">
     <header class="mandate__head">
-      <div>
-        <h2 id="mandate-heading" class="mandate__title">Agent mandate</h2>
-        <p class="mandate__sub">What your agent may do on its own, here and on your clients' pages.</p>
-      </div>
+      <h2 id="mandate-heading" class="mandate__title">Agent mandate</h2>
       <span class="mandate__state">{{ inForce ? `In force since ${signedOn}` : signed ? 'Changes not signed' : 'Not signed' }}</span>
+      <p class="mandate__sub">What your agent may do on its own, here and on your clients' pages.</p>
     </header>
 
     <p v-if="!signed" class="mandate__hint">Until you sign, the agent asks you before everything. Pick what it may handle alone.</p>
@@ -116,15 +115,16 @@ async function sign() {
     </p>
 
     <footer class="mandate__foot">
-      <div class="signature">
-        <span v-if="inForce" class="signature__ink" :class="{ 'signature__ink--fresh': fresh }">{{ signer }}</span>
-        <span class="signature__line" aria-hidden="true" />
-        <span class="signature__label">{{ inForce ? `Signed, ${signedOn}` : 'Your signature' }}</span>
-      </div>
+      <p class="signature" :class="{ 'signature--fresh': fresh }">
+        <template v-if="inForce">Signed by <strong>{{ signer }}</strong> on {{ signedOn }}</template>
+        <template v-else>{{ signed ? 'Sign again to put your changes in force.' : 'Not signed yet.' }}</template>
+      </p>
       <div class="mandate__actions">
-        <button v-if="inForce" type="button" class="btn btn--quiet btn--small" :disabled="busy === 'mandate'" @click="revokeMandate">Revoke</button>
-        <button v-else type="button" class="btn btn--small" :disabled="busy === 'mandate'" @click="sign">
-          {{ busy === 'mandate' ? 'Signing…' : signed ? 'Sign the changes' : 'Sign mandate' }}
+        <button v-if="inForce" type="button" class="btn btn--quiet btn--small" :disabled="busy === 'mandate'" :data-loading="busy === 'mandate'" :aria-busy="busy === 'mandate'" @click="revokeMandate">
+          Revoke
+        </button>
+        <button v-else type="button" class="btn btn--small" :disabled="busy === 'mandate'" :data-loading="busy === 'mandate'" :aria-busy="busy === 'mandate'" @click="sign">
+          {{ signed ? 'Sign the changes' : 'Sign mandate' }}
         </button>
       </div>
     </footer>
@@ -134,44 +134,34 @@ async function sign() {
 <style scoped>
 .mandate {
   position: relative;
-  background: var(--paper-pure);
-  border-radius: var(--radius-sheet);
-  box-shadow: var(--shadow-sheet);
-  padding: 1.25rem 1.25rem 1.1rem 1.5rem;
-  /* The carbon edge: blue while signed, amber while unsigned or edited. */
-  border-left: 4px solid var(--draft);
-  transition: border-color var(--dur-enter) var(--ease-out);
-}
-.mandate[data-state='signed'] {
-  border-left-color: var(--carbon);
 }
 .mandate__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+  /* Clear of the panel's close button. */
+  padding-right: 2.5rem;
 }
 .mandate__title {
   font-size: var(--t-lg);
 }
 .mandate__sub {
-  margin-top: 0.2rem;
   color: var(--ink-soft);
   font-size: var(--t-xs);
 }
 .mandate__state {
   flex-shrink: 0;
   font-size: var(--t-xs);
-  font-weight: 600;
-  padding: 0.1rem 0.5rem;
+  font-weight: 500;
+  padding: 0.15rem 0.55rem;
   border-radius: 999px;
   background: var(--draft-soft);
   color: var(--draft);
   white-space: nowrap;
 }
 .mandate[data-state='signed'] .mandate__state {
-  background: var(--carbon-soft);
-  color: var(--carbon);
+  background: var(--paid-soft);
+  color: var(--paid);
 }
 .mandate__hint {
   margin-top: 0.75rem;
@@ -188,11 +178,12 @@ async function sign() {
   grid-template-columns: 1.4rem 1fr auto;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.65rem 0;
-  border-top: 1px dashed var(--rule);
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--rule-soft);
 }
 .clause__n {
-  font: 500 var(--t-xs) var(--font-money);
+  font-size: var(--t-xs);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
 }
 .clause__text {
@@ -207,16 +198,19 @@ async function sign() {
 }
 .clause__control {
   border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--paper);
+  border-radius: 6px;
+  background: var(--paper-pure);
   font: var(--t-xs) var(--font-ui);
   color: var(--ink);
-  padding: 0.3rem 0.4rem;
-  transition: border-color var(--dur-press) var(--ease-out);
+  padding: 0.35rem 0.5rem;
+  transition:
+    border-color var(--dur-press) var(--ease-out),
+    box-shadow var(--dur-press) var(--ease-out);
 }
 .clause__control:focus {
   outline: none;
   border-color: var(--carbon);
+  box-shadow: 0 0 0 3px rgb(0 102 204 / 0.18);
 }
 .clause__money {
   display: inline-flex;
@@ -246,58 +240,24 @@ async function sign() {
   margin-top: 1rem;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 1rem;
 }
 .signature {
-  position: relative;
-  flex: 1;
-  max-width: 17rem;
-  min-height: 3.1rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  font-size: var(--t-xs);
+  color: var(--ink-soft);
 }
-.signature__ink {
-  position: absolute;
-  left: 0.2rem;
-  bottom: 1.05rem;
-  font: 2.1rem / 1 var(--font-sign);
-  color: var(--carbon);
-  white-space: nowrap;
-  transform: rotate(-2deg);
-  transform-origin: left bottom;
+.signature strong {
+  font-weight: 600;
+  color: var(--ink);
 }
-/* Drawn left to right like a pen stroke, once, in answer to the click. */
-.signature__ink--fresh {
-  animation: ink-in 700ms var(--ease-in-out) both;
+.signature--fresh {
+  animation: signed-in 320ms var(--ease-out) both;
 }
-@keyframes ink-in {
+@keyframes signed-in {
   from {
-    clip-path: inset(0 100% 0 0);
+    opacity: 0;
   }
-  to {
-    clip-path: inset(0 0 0 0);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .signature__ink--fresh {
-    animation: ink-fade 200ms linear both;
-  }
-  @keyframes ink-fade {
-    from {
-      opacity: 0;
-    }
-  }
-}
-.signature__line {
-  display: block;
-  border-bottom: 1px solid var(--ink-soft);
-}
-.signature__label {
-  margin-top: 0.25rem;
-  font-size: 0.72rem;
-  color: var(--ink-faint);
 }
 .mandate__actions {
   flex-shrink: 0;
@@ -310,10 +270,6 @@ async function sign() {
   .clause__money {
     grid-column: 2;
     justify-self: start;
-  }
-  .mandate__head {
-    flex-direction: column;
-    gap: 0.5rem;
   }
 }
 </style>

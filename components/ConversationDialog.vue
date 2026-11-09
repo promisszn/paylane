@@ -95,8 +95,8 @@ async function send() {
             <input v-model="apply" type="checkbox" /> Apply any change I agree to
           </label>
           <button type="button" class="btn btn--quiet" @click="conversation = null">Close</button>
-          <button type="submit" class="btn" :disabled="!reply.trim() || busy === 'reply'">
-            {{ busy === 'reply' ? (apply ? 'Posting and applying…' : 'Posting…') : 'Post reply' }}
+          <button type="submit" class="btn" :disabled="!reply.trim() || busy === 'reply'" :data-loading="busy === 'reply'" :aria-busy="busy === 'reply'">
+            Post reply
           </button>
         </footer>
       </form>
@@ -113,7 +113,7 @@ async function send() {
   border-radius: var(--radius-sheet);
   background: var(--paper-pure);
   color: var(--ink);
-  box-shadow: 0 24px 64px -24px rgb(22 35 63 / 0.5);
+  box-shadow: var(--shadow-dialog);
 }
 /* Same enter and exit as the email review dialog. */
 .convo {
@@ -141,18 +141,18 @@ async function send() {
   }
 }
 .convo::backdrop {
-  background: rgb(22 35 63 / 0);
+  background: rgb(0 0 0 / 0);
   transition:
     background-color var(--dur-enter) var(--ease-out),
     overlay var(--dur-enter) allow-discrete,
     display var(--dur-enter) allow-discrete;
 }
 .convo[open]::backdrop {
-  background: rgb(22 35 63 / 0.4);
+  background: rgb(0 0 0 / 0.32);
 }
 @starting-style {
   .convo[open]::backdrop {
-    background: rgb(22 35 63 / 0);
+    background: rgb(0 0 0 / 0);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -165,7 +165,6 @@ async function send() {
   display: grid;
   gap: 1rem;
   padding: 1.5rem;
-  border-top: 4px solid var(--draft);
 }
 .convo__head {
   display: flex;
@@ -213,8 +212,8 @@ async function send() {
 }
 .turn {
   max-width: 88%;
-  padding: 0.6rem 0.8rem;
-  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
+  border-radius: 14px;
   background: var(--paper);
 }
 .turn[data-role='client'] {
@@ -223,11 +222,11 @@ async function send() {
 }
 .turn[data-role='freelancer'] {
   background: var(--paper-pure);
-  border: 1px solid var(--ink-soft);
+  box-shadow: inset 0 0 0 1px var(--rule);
 }
 .turn__who {
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink-soft);
   display: flex;
   gap: 0.5rem;
@@ -252,7 +251,7 @@ async function send() {
   display: grid;
   gap: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px dashed var(--rule);
+  border-top: 1px solid var(--rule-soft);
 }
 .convo__actions {
   display: flex;

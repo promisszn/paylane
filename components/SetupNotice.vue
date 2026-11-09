@@ -41,7 +41,7 @@ const { status } = useDashboard()
   font-size: var(--t-xs);
 }
 code {
-  font-family: var(--font-money);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
 }
 </style>

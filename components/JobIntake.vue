@@ -84,8 +84,8 @@ async function submit() {
       </div>
 
       <div class="intake__row">
-        <button class="btn" type="submit" :disabled="!canSubmit">
-          {{ busy === 'plan' ? 'Reading the message…' : 'Plan payments' }}
+        <button class="btn" type="submit" :disabled="!canSubmit" :data-loading="busy === 'plan'" :aria-busy="busy === 'plan'">
+          Plan payments
         </button>
         <input
           ref="fileInput"
@@ -114,7 +114,7 @@ async function submit() {
 
 <style scoped>
 .intake {
-  background: var(--paper);
+  background: var(--paper-pure);
   border-radius: var(--radius-sheet);
   box-shadow: var(--shadow-sheet);
   padding: 1.5rem;
@@ -134,11 +134,6 @@ async function submit() {
 }
 .intake__textarea {
   min-height: 9rem;
-  /* Ruled paper: one rule per text line, scrolling with the content. */
-  background-image: linear-gradient(transparent calc(1.5em - 1px), var(--rule-soft) 0);
-  background-size: 100% 1.5em;
-  background-position: 0 0.55rem;
-  background-attachment: local;
 }
 .intake__row {
   display: flex;
@@ -183,7 +178,7 @@ async function submit() {
 .intake__examples {
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px dashed var(--rule);
+  border-top: 1px solid var(--rule-soft);
 }
 .intake__examples-label {
   font-size: var(--t-xs);
@@ -198,8 +193,8 @@ async function submit() {
   gap: 0.4rem;
 }
 .intake__example {
-  border: 1px solid var(--rule);
-  background: transparent;
+  border: 0;
+  background: var(--paper);
   border-radius: 999px;
   padding: 0.3rem 0.75rem;
   font: var(--t-xs) var(--font-ui);
@@ -209,7 +204,7 @@ async function submit() {
 .intake__example {
   transition:
     transform var(--dur-press) var(--ease-out),
-    border-color var(--dur-press) var(--ease-out),
+    background-color var(--dur-press) var(--ease-out),
     color var(--dur-press) var(--ease-out);
 }
 .intake__example:active {
@@ -217,8 +212,8 @@ async function submit() {
 }
 @media (hover: hover) and (pointer: fine) {
   .intake__example:hover {
-    border-color: var(--carbon);
-    color: var(--carbon);
+    background: var(--rule-soft);
+    color: var(--ink);
   }
 }
 </style>

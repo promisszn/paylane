@@ -125,33 +125,36 @@ async function submit() {
         <label v-if="canSplit" class="change__kind"><input v-model="kind" type="radio" value="split" /> Split</label>
       </fieldset>
 
-      <template v-if="kind === 'amount'">
-        <div class="change__row">
+      <!-- Same height whichever kind is picked, so the dialog doesn't jump as you switch. -->
+      <div class="change__fields">
+        <template v-if="kind === 'amount'">
+          <div class="change__row">
+            <label class="field">
+              <span class="field__label">New amount ({{ shown.project.currency }})</span>
+              <input v-model.number="amount" class="input money" type="number" min="1" step="0.01" inputmode="decimal" required />
+            </label>
+            <p class="change__diff money" aria-live="polite">{{ difference }}</p>
+          </div>
           <label class="field">
-            <span class="field__label">New amount ({{ shown.project.currency }})</span>
-            <input v-model.number="amount" class="input money" type="number" min="1" step="0.01" inputmode="decimal" required />
+            <span class="field__label">Why (optional, kept in your activity log)</span>
+            <input v-model="note" class="input" maxlength="200" placeholder="e.g. $100 off, agreed with the client" />
           </label>
-          <p class="change__diff money" aria-live="polite">{{ difference }}</p>
+        </template>
+
+        <label v-else-if="kind === 'due_date'" class="field">
+          <span class="field__label">New due date</span>
+          <input v-model="dueDate" class="input" type="date" :min="minDue" required />
+        </label>
+
+        <div v-else class="change__row">
+          <label class="field">
+            <span class="field__label">Payments</span>
+            <select v-model.number="parts" class="input">
+              <option v-for="n in [2, 3, 4, 5, 6]" :key="n" :value="n">{{ n }}</option>
+            </select>
+          </label>
+          <p class="change__diff money">{{ splitPreview }}</p>
         </div>
-        <label class="field">
-          <span class="field__label">Why (optional, kept in your activity log)</span>
-          <input v-model="note" class="input" maxlength="200" placeholder="e.g. $100 off, agreed with the client" />
-        </label>
-      </template>
-
-      <label v-else-if="kind === 'due_date'" class="field">
-        <span class="field__label">New due date</span>
-        <input v-model="dueDate" class="input" type="date" :min="minDue" required />
-      </label>
-
-      <div v-else class="change__row">
-        <label class="field">
-          <span class="field__label">Payments</span>
-          <select v-model.number="parts" class="input">
-            <option v-for="n in [2, 3, 4, 5, 6]" :key="n" :value="n">{{ n }}</option>
-          </select>
-        </label>
-        <p class="change__diff money">{{ splitPreview }}</p>
       </div>
 
       <label v-if="shown.project.portalToken" class="change__tell">
@@ -162,7 +165,9 @@ async function submit() {
 
       <footer class="change__actions">
         <button type="button" class="btn btn--quiet" @click="changing = null">Not now</button>
-        <button type="submit" class="btn" :disabled="!ready || busy === 'change'">{{ busy === 'change' ? 'Changing…' : 'Make the change' }}</button>
+        <button type="submit" class="btn" :disabled="!ready || busy === 'change'" :data-loading="busy === 'change'" :aria-busy="busy === 'change'">
+          Make the change
+        </button>
       </footer>
     </form>
   </dialog>
@@ -176,7 +181,7 @@ async function submit() {
   border-radius: var(--radius-sheet);
   background: var(--paper-pure);
   color: var(--ink);
-  box-shadow: 0 24px 64px -24px rgb(22 35 63 / 0.5);
+  box-shadow: var(--shadow-dialog);
 }
 /* Same enter and exit as the email review dialog. */
 .change {
@@ -204,18 +209,18 @@ async function submit() {
   }
 }
 .change::backdrop {
-  background: rgb(22 35 63 / 0);
+  background: rgb(0 0 0 / 0);
   transition:
     background-color var(--dur-enter) var(--ease-out),
     overlay var(--dur-enter) allow-discrete,
     display var(--dur-enter) allow-discrete;
 }
 .change[open]::backdrop {
-  background: rgb(22 35 63 / 0.4);
+  background: rgb(0 0 0 / 0.32);
 }
 @starting-style {
   .change[open]::backdrop {
-    background: rgb(22 35 63 / 0);
+    background: rgb(0 0 0 / 0);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -228,7 +233,6 @@ async function submit() {
   display: grid;
   gap: 1rem;
   padding: 1.5rem;
-  border-top: 4px solid var(--carbon);
 }
 .change__eyebrow {
   font-size: var(--t-xs);
@@ -273,6 +277,13 @@ async function submit() {
   accent-color: var(--carbon);
   margin: 0;
 }
+.change__fields {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  /* The amount fields are the tallest of the three. */
+  min-height: 9.5rem;
+}
 .change__row {
   display: grid;
   grid-template-columns: minmax(0, 12rem) 1fr;
@@ -296,6 +307,8 @@ async function submit() {
   margin: 0;
 }
 .change__fine {
+  /* Two lines whatever it says, so switching kinds doesn't move the buttons. */
+  min-height: calc(2 * 1.5 * var(--t-xs));
   font-size: var(--t-xs);
   color: var(--ink-faint);
 }

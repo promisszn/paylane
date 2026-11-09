@@ -31,12 +31,12 @@ const WEEKS_AHEAD_MIN = 6
 const WEEKS_AHEAD_MAX = 12
 
 // Same tokens as assets/css/main.css. Canvas can't read CSS variables, so they're repeated here.
-const COLOR = { paid: '#18794e', due: '#2747c9', overdue: '#b4322a' } as const
-const INK_SOFT = '#4a5672'
-const INK_FAINT = '#7d879c'
-const RULE_SOFT = '#e1e6ed'
+const COLOR = { paid: '#1d7a36', due: '#0066cc', overdue: '#c4161c' } as const
+const INK_SOFT = '#6e6e73'
+const INK_FAINT = '#7c7c80'
+const RULE_SOFT = '#e8e8ed'
 const SURFACE = '#ffffff'
-const FONT = 'Schibsted Grotesk, ui-sans-serif, system-ui, sans-serif'
+const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif"
 
 type Kind = keyof typeof COLOR
 interface Item {
@@ -314,7 +314,7 @@ const legend: Array<{ kind: Kind; label: string }> = [
 .flow__swatch {
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: 50%;
 }
 /* Fixed height includes the x-axis band, so the card never scrolls inside. */
 .flow__chart {

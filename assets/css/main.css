@@ -1,45 +1,46 @@
-/* Paylane: carbon-copy invoice book. Blue carbon ink, cool paper, a green PAID stamp. */
+/* Paylane: white surfaces on a light grey ground, the system font, colour only where it means something. */
 :root {
-  --desk: #e6eaf0;
-  --paper: #f7f8fa;
+  /* Neutral, system-like palette: white surfaces on a light grey ground, colour only for meaning. */
+  --desk: #f5f5f7;
+  --paper: #f5f5f7;
   --paper-pure: #ffffff;
-  --ink: #16233f;
-  --ink-soft: #4a5672;
-  --ink-faint: #7d879c;
-  --carbon: #2747c9;
-  --carbon-soft: #e3e8fb;
-  --paid: #18794e;
-  --paid-soft: #e0f1e8;
-  --overdue: #b4322a;
-  --overdue-soft: #f8e4e2;
-  --draft: #8a5a00;
-  --draft-soft: #fbf0d9;
-  --rule: #cdd4de;
-  --rule-soft: #e1e6ed;
+  --ink: #1d1d1f;
+  --ink-soft: #6e6e73;
+  --ink-faint: #7c7c80;
+  --carbon: #0066cc;
+  --carbon-soft: #e8f0fb;
+  --paid: #1d7a36;
+  --paid-soft: #e7f4eb;
+  --overdue: #c4161c;
+  --overdue-soft: #fcebec;
+  --draft: #a14b00;
+  --draft-soft: #fdf1e4;
+  --rule: #d2d2d7;
+  --rule-soft: #e8e8ed;
 
-  --font-ui: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
-  --font-money: 'Spline Sans Mono', ui-monospace, monospace;
-  /* Only for the signature on the mandate. */
-  --font-sign: 'Mrs Saint Delafield', 'Brush Script MT', cursive;
+  /* The platform's own font: San Francisco on Apple devices, Segoe UI / Roboto elsewhere. */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-money: var(--font-ui);
 
-  /* Type scale (1.2 minor third) */
+  /* Type scale */
   --t-xs: 0.8125rem;
   --t-sm: 0.9375rem;
   --t-md: 1.0625rem;
-  --t-lg: 1.375rem;
+  --t-lg: 1.3125rem;
   --t-xl: 1.75rem;
-  --t-2xl: 2.375rem;
+  --t-2xl: 2.5rem;
 
-  /* Motion (Emil Kowalski): strong custom curves, short durations, nothing decorative. */
+  /* Motion: short, critically damped, nothing decorative. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --dur-press: 160ms;
+  --dur-press: 120ms;
   --dur-enter: 220ms;
   --dur-exit: 150ms;
 
-  --radius-sheet: 3px;
-  --radius-control: 6px;
-  --shadow-sheet: 0 1px 0 var(--rule), 0 8px 24px -16px rgb(22 35 63 / 0.35);
+  --radius-sheet: 14px;
+  --radius-control: 8px;
+  --shadow-sheet: 0 0 0 1px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.08);
+  --shadow-dialog: 0 0 0 1px rgb(0 0 0 / 0.05), 0 24px 64px -16px rgb(0 0 0 / 0.28);
 }
 
 *,
@@ -68,7 +69,8 @@ h3 {
   margin: 0;
   line-height: 1.2;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  /* Larger text reads better tracked in a little. */
+  letter-spacing: -0.015em;
 }
 
 p {
@@ -76,26 +78,26 @@ p {
 }
 
 .money {
-  font-family: var(--font-money);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
 }
 
-/* Buttons */
+/* Buttons. Feedback lands on press, not on release. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
   min-height: 2.5rem;
-  padding: 0 1rem;
-  border: 1px solid var(--ink);
+  padding: 0 1.05rem;
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
-  background: var(--ink);
-  color: var(--paper-pure);
-  font: 600 var(--t-sm) / 1 var(--font-ui);
+  background: var(--carbon);
+  color: #fff;
+  font: 500 var(--t-sm) / 1 var(--font-ui);
   cursor: pointer;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: none;
   white-space: nowrap;
   transition:
     transform var(--dur-press) var(--ease-out),
@@ -107,41 +109,78 @@ p {
   transform: scale(0.97);
 }
 @media (hover: hover) and (pointer: fine) {
-  .btn:hover {
-    background: var(--carbon);
-    border-color: var(--carbon);
+  .btn:hover:not(:disabled) {
+    background: #0057b0;
   }
 }
-.btn:disabled {
-  opacity: 0.55;
+.btn:disabled:not([data-loading='true']) {
+  opacity: 0.45;
+  cursor: default;
+}
+/*
+ * Working: the label stays (so the button keeps its exact size and nothing around it moves),
+ * turns invisible, and a spinner takes its place in the middle. Full strength, not greyed out,
+ * so it reads as "in progress" rather than "unavailable". Set data-loading="true" on any
+ * .btn or .grid-action, with aria-busy for screen readers.
+ */
+.btn {
+  --spinner: #fff;
+}
+.btn--quiet,
+.btn--danger {
+  --spinner: var(--ink);
+}
+.btn[data-loading='true'],
+.grid-action[data-loading='true'] {
+  position: relative;
+  color: transparent !important;
   cursor: progress;
+  pointer-events: none;
+}
+.btn[data-loading='true']::after,
+.grid-action[data-loading='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  border: 2px solid var(--spinner, var(--ink));
+  border-right-color: transparent;
+  animation: btn-spin 700ms linear infinite;
+}
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .btn--quiet {
-  background: transparent;
+  background: var(--paper-pure);
   color: var(--ink);
   border-color: var(--rule);
 }
 @media (hover: hover) and (pointer: fine) {
-  .btn--quiet:hover {
-    background: var(--paper-pure);
-    border-color: var(--ink);
+  .btn--quiet:hover:not(:disabled) {
+    background: var(--paper);
+    border-color: var(--rule);
     color: var(--ink);
   }
 }
 .btn--small {
   min-height: 2rem;
-  padding: 0 0.75rem;
+  padding: 0 0.8rem;
   font-size: var(--t-xs);
 }
 .btn--danger {
-  background: transparent;
+  background: var(--paper-pure);
   color: var(--overdue);
-  border-color: var(--overdue-soft);
+  border-color: var(--rule);
 }
 @media (hover: hover) and (pointer: fine) {
-  .btn--danger:hover {
+  .btn--danger:hover:not(:disabled) {
     background: var(--overdue-soft);
-    border-color: var(--overdue);
+    border-color: var(--overdue-soft);
     color: var(--overdue);
   }
 }
@@ -181,30 +220,34 @@ p {
 .textarea:focus {
   outline: none;
   border-color: var(--carbon);
-  box-shadow: 0 0 0 3px var(--carbon-soft);
+  box-shadow: 0 0 0 3px rgb(0 102 204 / 0.18);
 }
 .textarea {
   resize: vertical;
 }
 
-/* Status stamps, used in the grid and on the receipt */
+/* Status pills, used in the ledger and on the client page. Tinted fill, no outline. */
 .stamp {
   display: inline-block;
-  padding: 0.1rem 0.5rem;
-  border: 1.5px solid currentColor;
-  border-radius: 3px;
-  font: 600 var(--t-xs) / 1.4 var(--font-ui);
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font: 500 0.75rem / 1.4 var(--font-ui);
   white-space: nowrap;
+  color: var(--ink-soft);
+  background: var(--paper);
 }
-.stamp--planned {
-  color: var(--ink-faint);
-  border-style: dashed;
+.stamp--planned,
+.stamp--split,
+.stamp--cancelled {
+  color: var(--ink-soft);
+  background: var(--paper);
 }
 .stamp--draft {
   color: var(--draft);
   background: var(--draft-soft);
 }
-.stamp--sent {
+.stamp--sent,
+.stamp--promised {
   color: var(--carbon);
   background: var(--carbon-soft);
 }
@@ -215,35 +258,17 @@ p {
 .stamp--paid {
   color: var(--paid);
   background: var(--paid-soft);
-  transform: rotate(-3deg);
-}
-.stamp--cancelled {
-  color: var(--ink-faint);
-  text-decoration: line-through;
-}
-.stamp--split {
-  color: var(--ink-soft);
-  border-style: dashed;
-}
-.stamp--promised {
-  color: var(--carbon);
-  border-style: dashed;
 }
 
 /*
- * What the agent did in a chat turn, printed under its reply like a line on a carbon copy.
+ * What the agent did in a chat turn, listed under its reply.
  * Used on the client page and in the dashboard's conversation view.
  */
 .receipt-line {
   display: flex;
   align-items: baseline;
   gap: 0.45rem;
-  padding: 0.3rem 0.55rem;
-  border: 1px dashed var(--rule);
-  border-radius: 4px;
-  background: var(--paper-pure);
-  font: 500 0.75rem / 1.4 var(--font-money);
-  letter-spacing: -0.01em;
+  font: 500 0.75rem / 1.4 var(--font-ui);
   color: var(--ink-soft);
 }
 .receipt-line::before {

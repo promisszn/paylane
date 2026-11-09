@@ -67,7 +67,7 @@ const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
 
       <footer class="review__actions">
         <button type="button" class="btn btn--quiet" @click="pendingEmail = null">Not now</button>
-        <button type="submit" class="btn" :disabled="sending">{{ sending ? 'Sending…' : cta }}</button>
+        <button type="submit" class="btn" :disabled="sending" :data-loading="sending" :aria-busy="sending">{{ cta }}</button>
       </footer>
     </form>
   </dialog>
@@ -81,7 +81,7 @@ const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
   border-radius: var(--radius-sheet);
   background: var(--paper-pure);
   color: var(--ink);
-  box-shadow: 0 24px 64px -24px rgb(22 35 63 / 0.5);
+  box-shadow: var(--shadow-dialog);
 }
 /*
  * Enter: scale up from 0.96 with a strong ease-out. Exit: quicker and simpler.
@@ -113,18 +113,18 @@ const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
   }
 }
 .review::backdrop {
-  background: rgb(22 35 63 / 0);
+  background: rgb(0 0 0 / 0);
   transition:
     background-color var(--dur-enter) var(--ease-out),
     overlay var(--dur-enter) allow-discrete,
     display var(--dur-enter) allow-discrete;
 }
 .review[open]::backdrop {
-  background: rgb(22 35 63 / 0.4);
+  background: rgb(0 0 0 / 0.32);
 }
 @starting-style {
   .review[open]::backdrop {
-    background: rgb(22 35 63 / 0);
+    background: rgb(0 0 0 / 0);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -137,7 +137,6 @@ const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
   display: grid;
   gap: 1rem;
   padding: 1.5rem;
-  border-top: 4px solid var(--carbon);
 }
 .review__eyebrow {
   font-size: var(--t-xs);
@@ -184,7 +183,8 @@ const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
 .review__footer {
   margin-top: -0.4rem;
   padding: 0.5rem 0.7rem;
-  border: 1px dashed var(--rule);
+  border: 0;
+  background: var(--paper);
   border-radius: var(--radius-control);
   font-size: var(--t-xs);
   color: var(--ink-soft);

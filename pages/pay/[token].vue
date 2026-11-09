@@ -275,7 +275,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
               placeholder="Write a message"
               @keydown.enter.exact.prevent="send()"
             />
-            <button type="submit" class="btn" :disabled="!message.trim() || sending">Send</button>
+            <button type="submit" class="btn" :disabled="!message.trim() || sending" :data-loading="sending" :aria-busy="sending">Send</button>
           </form>
           <p v-if="chatError" class="composer__error" role="alert">{{ chatError }}</p>
         </section>
@@ -303,12 +303,25 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   color: var(--ink-soft);
 }
 .pay__top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 1rem clamp(1rem, 4vw, 2.5rem);
-  border-bottom: 1px solid var(--rule);
+  padding: 0.75rem clamp(1rem, 4vw, 2.5rem);
+  background: rgb(245 245 247 / 0.78);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgb(0 0 0 / 0.06);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .pay__top {
+    background: var(--desk);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 .pay__brand {
   display: flex;
@@ -324,7 +337,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   clip-path: polygon(0 0, 100% 0, 100% 100%, 83% 88%, 66% 100%, 50% 88%, 33% 100%, 17% 88%, 0 100%);
 }
 .pay__business {
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -345,22 +358,16 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   align-items: start;
 }
 
-/* --- The statement: a perforated sheet, like the plan receipt on the dashboard --- */
+/* --- The statement --- */
 .sheet {
-  --edge: 10px;
   background: var(--paper-pure);
-  padding: 1.9rem 1.5rem 1.6rem;
+  border-radius: var(--radius-sheet);
+  padding: 1.75rem 1.5rem 1.5rem;
   box-shadow: var(--shadow-sheet);
-  -webkit-mask:
-    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--edge) 51% repeat-x,
-    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--edge) 51% repeat-x;
-  mask:
-    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--edge) 51% repeat-x,
-    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / var(--edge) 51% repeat-x;
 }
 .sheet__eyebrow {
   font-size: var(--t-xs);
-  color: var(--carbon);
+  color: var(--ink-soft);
   font-weight: 500;
 }
 .sheet__title {
@@ -434,7 +441,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem 0;
-  border-top: 2px dashed var(--rule);
+  border-top: 1px solid var(--rule-soft);
 }
 .stub[data-status='replaced'] {
   opacity: 0.55;
@@ -460,7 +467,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
 }
 .stub__late {
   color: var(--overdue);
-  font-weight: 600;
+  font-weight: 500;
 }
 .stub__note {
   color: var(--carbon);
@@ -475,7 +482,8 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
 }
 .stub__amount {
   font-size: var(--t-lg);
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 .stub__pay {
   text-decoration: none;
@@ -498,21 +506,14 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   opacity: 0;
   transform: translateY(-6px);
 }
-/* The PAID stamp, pressed onto the stub the moment PayPal confirms the payment. */
+/* The Paid badge arrives the moment PayPal confirms the payment: a short scale-in, no bounce. */
 .stamp--fresh {
-  animation: stamp-in 460ms var(--ease-out) both;
+  animation: stamp-in 260ms var(--ease-out) both;
 }
 @keyframes stamp-in {
-  0% {
+  from {
     opacity: 0;
-    transform: rotate(-14deg) scale(1.9);
-  }
-  55% {
-    opacity: 1;
-    transform: rotate(-2deg) scale(0.92);
-  }
-  100% {
-    transform: rotate(-3deg) scale(1);
+    transform: scale(0.9);
   }
 }
 .sheet__empty {
@@ -522,7 +523,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
 .later {
   margin-top: 0.5rem;
   padding-top: 1rem;
-  border-top: 2px dashed var(--rule);
+  border-top: 1px solid var(--rule-soft);
 }
 .later__title {
   font-size: var(--t-xs);
@@ -549,7 +550,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
 .sheet__fine {
   margin-top: 1.4rem;
   padding-top: 1rem;
-  border-top: 3px double var(--ink);
+  border-top: 1px solid var(--rule-soft);
   font-size: var(--t-xs);
   color: var(--ink-faint);
 }
@@ -562,9 +563,8 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   flex-direction: column;
   /* Fits the screen from its first position under the header, so the message box is never below the fold. */
   max-height: calc(100dvh - 8rem);
-  background: var(--paper);
+  background: var(--paper-pure);
   border-radius: var(--radius-sheet);
-  border-top: 4px solid var(--carbon);
   box-shadow: var(--shadow-sheet);
 }
 .talk__head {
@@ -605,10 +605,10 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
 }
 .msg {
   max-width: 86%;
-  padding: 0.6rem 0.8rem;
-  border-radius: 12px;
-  background: var(--paper-pure);
-  border: 1px solid var(--rule-soft);
+  padding: 0.6rem 0.85rem;
+  border-radius: 16px;
+  background: var(--paper);
+  border: 1px solid transparent;
 }
 .msg[data-role='client'] {
   align-self: flex-end;
@@ -617,13 +617,14 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   color: var(--paper-pure);
 }
 .msg[data-role='freelancer'] {
-  border-color: var(--ink-soft);
+  background: var(--paper-pure);
+  border-color: var(--rule);
 }
 .msg__who {
   display: flex;
   gap: 0.45rem;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink-soft);
 }
 .msg__who time {
@@ -702,8 +703,8 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   padding: 0 1.25rem 0.75rem;
 }
 .chip {
-  border: 1px solid var(--rule);
-  background: var(--paper-pure);
+  border: 0;
+  background: var(--paper);
   border-radius: 999px;
   padding: 0.35rem 0.75rem;
   font: var(--t-xs) var(--font-ui);
@@ -711,7 +712,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   cursor: pointer;
   transition:
     transform var(--dur-press) var(--ease-out),
-    border-color var(--dur-press) var(--ease-out),
+    background-color var(--dur-press) var(--ease-out),
     color var(--dur-press) var(--ease-out);
 }
 .chip:active:not(:disabled) {
@@ -723,8 +724,8 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
 }
 @media (hover: hover) and (pointer: fine) {
   .chip:hover:not(:disabled) {
-    border-color: var(--carbon);
-    color: var(--carbon);
+    background: var(--rule-soft);
+    color: var(--ink);
   }
 }
 .composer {
@@ -755,7 +756,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
 .composer__input:focus {
   outline: none;
   border-color: var(--carbon);
-  box-shadow: 0 0 0 3px var(--carbon-soft);
+  box-shadow: 0 0 0 3px rgb(0 102 204 / 0.18);
 }
 .composer__error {
   padding: 0 1.25rem 1rem;
