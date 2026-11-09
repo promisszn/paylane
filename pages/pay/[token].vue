@@ -333,7 +333,8 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   flex-shrink: 0;
   width: 1rem;
   height: 1.25rem;
-  background: var(--ink);
+  /* The brand blue, same as the dashboard logo and the favicon. */
+  background: #2747c9;
   clip-path: polygon(0 0, 100% 0, 100% 100%, 83% 88%, 66% 100%, 50% 88%, 33% 100%, 17% 88%, 0 100%);
 }
 .pay__business {
