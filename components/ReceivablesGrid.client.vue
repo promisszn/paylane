@@ -28,7 +28,7 @@ import type { ReceivableRow } from '~/types'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
-const { data, status, reviewInvoice, reviewReminder, cancelMilestone, makeOverdue } = useDashboard()
+const { data, status, reviewInvoice, reviewReminder, cancelMilestone, makeOverdue, openChange } = useDashboard()
 const demo = computed(() => Boolean(status.value?.demoMode))
 
 /** What the totals row adds up, per currency, over the rows the search leaves. */
@@ -80,13 +80,13 @@ function statusLabel(r: ReceivableRow) {
 function actionsFor(r: ReceivableRow): Array<[string, string]> {
   switch (r.status) {
     case 'planned':
-      return r.trigger === 'upfront' ? [['draft', 'Draft']] : [['done', 'Mark done']]
+      return r.trigger === 'upfront' ? [['draft', 'Draft'], ['change', 'Change']] : [['done', 'Mark done'], ['change', 'Change']]
     case 'draft':
-      return [['send', 'Send'], ['cancel', 'Cancel']]
+      return [['send', 'Send'], ['change', 'Change'], ['cancel', 'Cancel']]
     case 'sent':
       return demo.value
-        ? [['remind', 'Remind'], ['page', 'Client page'], ['overdue', 'Backdate']]
-        : [['remind', 'Remind'], ['page', 'Client page']]
+        ? [['remind', 'Remind'], ['change', 'Change'], ['page', 'Client page'], ['overdue', 'Backdate']]
+        : [['remind', 'Remind'], ['change', 'Change'], ['page', 'Client page']]
     case 'paid':
       return r.clientPage ? [['page', 'Client page']] : []
     default:
@@ -144,6 +144,7 @@ function totalRows(rows: ReceivableRow[]): LedgerRow[] {
     promiseDate: null,
     splitInto: 0,
     installment: null,
+    wasAmount: null,
     totals,
   }))
 }
@@ -187,7 +188,7 @@ function totalBreakdown(r: LedgerRow) {
 const columnDefs: ColDef<LedgerRow>[] = [
   // Client names are short, job names are the longest text, so Job gets the most room.
   // Fixed columns are sized to their content so the whole grid fits 1160px even in demo mode
-  // (flex minimums 70 + 140 + 140 plus fixed widths 781 = 1131), with every header readable.
+  // (flex minimums 70 + 110 + 110 plus fixed widths 851 = 1141), with every header readable.
   {
     field: 'client',
     headerName: 'Client',
@@ -198,8 +199,8 @@ const columnDefs: ColDef<LedgerRow>[] = [
     colSpan: (p) => (isTotal(p) ? 3 : 1),
     cellRendererSelector: (p) => (isTotal(p) ? { component: totalLabel } : undefined),
   },
-  { field: 'project', headerName: 'Job', minWidth: 140, flex: 1.4, tooltipField: 'project' },
-  { field: 'milestone', headerName: 'Milestone', minWidth: 140, flex: 1.5, tooltipField: 'milestone' },
+  { field: 'project', headerName: 'Job', minWidth: 110, flex: 1.4, tooltipField: 'project' },
+  { field: 'milestone', headerName: 'Milestone', minWidth: 110, flex: 1.5, tooltipField: 'milestone' },
   {
     field: 'amount',
     headerName: 'Amount',
@@ -207,6 +208,7 @@ const columnDefs: ColDef<LedgerRow>[] = [
     type: 'rightAligned',
     cellClass: 'money',
     valueFormatter: (p) => (p.data ? formatMoney(p.value, p.data.currency) : ''),
+    tooltipValueGetter: (p) => (p.data?.wasAmount ? `Was ${formatMoney(p.data.wasAmount, p.data.currency)} before you changed it` : undefined),
     // So "$800" and "800" both find it.
     getQuickFilterText: (p) => (p.data ? `${formatMoney(p.value, p.data.currency)} ${p.data.currency}` : ''),
   },
@@ -243,7 +245,7 @@ const columnDefs: ColDef<LedgerRow>[] = [
     colId: 'actions',
     headerName: '',
     // Room for the extra demo button. Status is loaded before this client-only grid mounts.
-    width: demo.value ? 280 : 200,
+    width: demo.value ? 350 : 270,
     pinned: 'right',
     sortable: false,
     getQuickFilterText: () => '',
@@ -337,6 +339,7 @@ function runAction(action: string, r: ReceivableRow) {
   else if (action === 'remind') reviewReminder(r.projectId, r.milestoneId)
   else if (action === 'cancel') cancelMilestone(r.projectId, r.milestoneId)
   else if (action === 'overdue') makeOverdue(r.projectId, r.milestoneId, r.daysOverdue)
+  else if (action === 'change') openChange(r.projectId, r.milestoneId)
   else if (action === 'page' && r.clientPage) window.open(r.clientPage, '_blank', 'noopener')
 }
 

@@ -169,6 +169,7 @@ export function toRows(projects: Project[]): ReceivableRow[] {
       promiseDate: m.promise && promiseActive(m) ? m.promise.date : null,
       splitInto: m.replacedBy?.length ?? 0,
       installment: m.installment ? `${m.installment.index} of ${m.installment.count}` : null,
+      wasAmount: m.adjusted?.from ?? null,
     })),
   )
 }

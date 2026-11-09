@@ -80,6 +80,8 @@ export interface Milestone {
   installment?: { of: string; index: number; count: number }
   /** Why the agent's last attempt to send a reminder on its own failed. Cleared when one goes out. */
   autoRemindError?: string
+  /** The amount was changed after the plan was agreed (e.g. a discount). `from` is the amount before the first change. */
+  adjusted?: { from: number; at: string; note?: string }
 }
 
 export interface Client {
@@ -148,8 +150,26 @@ export interface Mandate {
 
 /** Something the agent did during a chat turn, shown as a receipt line under its reply. */
 export interface ChatAction {
-  kind: 'extended' | 'split' | 'promise' | 'checked' | 'escalated' | 'approved' | 'declined'
+  kind: 'extended' | 'split' | 'promise' | 'checked' | 'escalated' | 'approved' | 'declined' | 'changed'
   text: string
+}
+
+/**
+ * One change to what a client owes or when, made by you: from the ledger, or by the agent
+ * acting on something you agreed to in a reply on the client page.
+ */
+export type TermsChange =
+  | { kind: 'amount'; milestoneId: string; amount: number; note?: string }
+  | { kind: 'due_date'; milestoneId: string; dueDate: string }
+  | { kind: 'split'; milestoneId: string; parts: number }
+
+/** What happened when a change was applied, for the toast and the client page. */
+export interface ChangeOutcome {
+  ok: boolean
+  /** One line for you, e.g. "Phase 3 is now $700.00 (was $800.00)". */
+  text: string
+  /** The sentence the agent posts on the client page, when it went through. */
+  clientText?: string
 }
 
 /** One message on the client page. "freelancer" is you replying from the dashboard. */
@@ -222,6 +242,8 @@ export interface ReceivableRow {
   /** How many installments replaced this invoice (0 if it wasn't split). */
   splitInto: number
   installment: string | null
+  /** The amount before you changed it, e.g. before a discount. */
+  wasAmount: number | null
 }
 
 /** What the client page shows. Only this job, nothing internal. */
@@ -247,8 +269,10 @@ export interface PortalView {
     promiseDate: string | null
     installment: string | null
     replacedBy: string[]
+    /** The amount before you changed it, e.g. before a discount. */
+    wasAmount: number | null
   }>
-  upcoming: Array<{ name: string; amount: number; when: string }>
+  upcoming: Array<{ name: string; amount: number; when: string; wasAmount: number | null }>
   conversation: ChatTurn[]
   /** The agent's limits are never shown, only whether it has any authority. */
   agentCanHelp: boolean

@@ -10,6 +10,8 @@ const { conversation, status, busy, sendReply } = useDashboard()
 const dialog = ref<HTMLDialogElement | null>(null)
 const list = ref<HTMLDivElement | null>(null)
 const reply = ref('')
+/** Let the agent make any change to a payment you agree to in this reply. */
+const apply = ref(true)
 // Keep the last conversation rendered while the dialog animates out.
 const shown = ref<OpenConversation | null>(null)
 
@@ -41,7 +43,7 @@ watch(
 
 async function send() {
   if (!reply.value.trim()) return
-  if (await sendReply(reply.value.trim())) {
+  if (await sendReply(reply.value.trim(), apply.value)) {
     reply.value = ''
     toBottom()
   }
@@ -89,8 +91,13 @@ async function send() {
           />
         </label>
         <footer class="convo__actions">
+          <label class="convo__apply" title="A discount, a later due date or a split you agree to here is made on PayPal straight away, and the agent tells your client.">
+            <input v-model="apply" type="checkbox" /> Apply any change I agree to
+          </label>
           <button type="button" class="btn btn--quiet" @click="conversation = null">Close</button>
-          <button type="submit" class="btn" :disabled="!reply.trim() || busy === 'reply'">{{ busy === 'reply' ? 'Posting…' : 'Post reply' }}</button>
+          <button type="submit" class="btn" :disabled="!reply.trim() || busy === 'reply'">
+            {{ busy === 'reply' ? (apply ? 'Posting and applying…' : 'Posting…') : 'Post reply' }}
+          </button>
         </footer>
       </form>
     </div>
@@ -249,7 +256,21 @@ async function send() {
 }
 .convo__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: 0.5rem;
+}
+.convo__apply {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: auto;
+  font-size: var(--t-xs);
+  color: var(--ink-soft);
+}
+.convo__apply input {
+  accent-color: var(--carbon);
+  margin: 0;
 }
 </style>

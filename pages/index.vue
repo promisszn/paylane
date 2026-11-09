@@ -86,6 +86,7 @@ onBeforeUnmount(() => {
 
     <EmailReview />
     <ConversationDialog />
+    <ChangePayment />
 
     <ToastStack />
   </div>

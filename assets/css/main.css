@@ -256,7 +256,8 @@ p {
   transform: translateY(-1px);
 }
 .receipt-line[data-kind='checked']::before,
-.receipt-line[data-kind='approved']::before {
+.receipt-line[data-kind='approved']::before,
+.receipt-line[data-kind='changed']::before {
   background: var(--paid);
 }
 .receipt-line[data-kind='escalated']::before {

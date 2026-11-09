@@ -1,6 +1,7 @@
 import type {
   ActivityEntry,
   AppStatus,
+  ChangeOutcome,
   ChatTurn,
   CurrencySummary,
   IntakeAttachment,
@@ -10,6 +11,7 @@ import type {
   ProjectPlan,
   ReceivableRow,
   ReminderTone,
+  TermsChange,
 } from '~/types'
 
 export interface ConversationSummary {
@@ -54,6 +56,12 @@ export interface OpenConversation {
   clientPage: string | null
   turns: ChatTurn[]
   requestId?: string
+}
+
+/** The payment open in the Change dialog. */
+export interface ChangingPayment {
+  projectId: string
+  milestoneId: string
 }
 
 export interface Toast {
@@ -122,6 +130,7 @@ export function useDashboard() {
   const sourceMessage = useState('sourceMessage', () => '')
   const pendingEmail = useState<PendingEmail | null>('pendingEmail', () => null)
   const conversation = useState<OpenConversation | null>('conversation', () => null)
+  const changing = useState<ChangingPayment | null>('changing', () => null)
   const toasts = useState<Toast[]>('toasts', () => [])
   const busy = useState<string | null>('busy', () => null)
   /** What the agent is doing on a client page right now, for the live line on the dashboard. */
@@ -362,16 +371,51 @@ export function useDashboard() {
     if (res && conversation.value?.projectId === open.projectId) conversation.value = { ...res, requestId: conversation.value.requestId }
   }
 
-  async function sendReply(text: string) {
+  /**
+   * Post your reply. With `apply`, the agent then reads it and makes any change to a payment
+   * you agreed to (a discount, more time, a split), and says so on the client's page.
+   */
+  async function sendReply(text: string, apply = true) {
     const open = conversation.value
     if (!open) return false
     const res = await run('reply', () =>
-      $fetch<{ turn: unknown }>(`/api/chats/${open.projectId}` as string, { method: 'POST', body: { text, requestId: open.requestId } }),
+      $fetch<{ changes: ChangeOutcome[]; followError?: string }>(`/api/chats/${open.projectId}` as string, {
+        method: 'POST',
+        body: { text, requestId: open.requestId, apply },
+      }),
     )
     if (res === undefined) return false
     conversation.value = { ...open, requestId: undefined }
     await Promise.all([reloadConversation(), refresh()])
     notify(`Reply posted on ${open.client}'s page.`)
+    for (const c of res.changes) notify(c.ok ? `On your word: ${c.text}` : c.text, c.ok ? 'agent' : 'error')
+    if (res.followError) notify(res.followError, 'error')
+    return true
+  }
+
+  // ---------------------------------------------------------------------------
+  // Changing a payment yourself: amount, due date or split
+  // ---------------------------------------------------------------------------
+
+  function openChange(projectId: string, milestoneId: string) {
+    changing.value = { projectId, milestoneId }
+  }
+
+  type ChangeInput =
+    | Omit<Extract<TermsChange, { kind: 'amount' }>, 'milestoneId'>
+    | Omit<Extract<TermsChange, { kind: 'due_date' }>, 'milestoneId'>
+    | Omit<Extract<TermsChange, { kind: 'split' }>, 'milestoneId'>
+
+  async function changePayment(change: ChangeInput, tellClient: boolean) {
+    const target = changing.value
+    if (!target) return false
+    const res = await run('change', () =>
+      $fetch<ChangeOutcome>('/api/milestones/change', { method: 'POST', body: { ...target, ...change, tellClient } }),
+    )
+    if (!res) return false
+    changing.value = null
+    await refresh()
+    notify(res.text)
     return true
   }
 
@@ -381,6 +425,7 @@ export function useDashboard() {
     plan,
     pendingEmail,
     conversation,
+    changing,
     toasts,
     dismiss,
     busy,
@@ -402,6 +447,8 @@ export function useDashboard() {
     openConversation,
     reloadConversation,
     sendReply,
+    openChange,
+    changePayment,
     notify,
   }
 }

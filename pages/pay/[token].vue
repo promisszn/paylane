@@ -195,7 +195,9 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
                 </p>
               </div>
               <div class="stub__side">
-                <p class="stub__amount money">{{ money(inv.amount) }}</p>
+                <p class="stub__amount money">
+                  <s v-if="inv.wasAmount" class="was">{{ money(inv.wasAmount) }}</s>{{ money(inv.amount) }}
+                </p>
                 <a v-if="inv.payUrl" :href="inv.payUrl" target="_blank" rel="noopener" class="btn btn--small stub__pay">Pay with PayPal</a>
                 <span v-else-if="inv.status === 'paid'" class="stamp stamp--paid" :class="{ 'stamp--fresh': fresh.has(inv.id) }">Paid</span>
                 <span v-else-if="inv.status === 'replaced'" class="stamp stamp--split">Split</span>
@@ -210,7 +212,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
             <ul class="later__list">
               <li v-for="u in view.upcoming" :key="u.name">
                 <span>{{ u.name }} <span class="later__when">{{ u.when }}</span></span>
-                <span class="money">{{ money(u.amount) }}</span>
+                <span class="money"><s v-if="u.wasAmount" class="was">{{ money(u.wasAmount) }}</s>{{ money(u.amount) }}</span>
               </li>
             </ul>
           </div>
@@ -477,6 +479,13 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
 }
 .stub__pay {
   text-decoration: none;
+}
+/* The amount before a change you made, e.g. a discount: struck through, quieter. */
+.was {
+  margin-right: 0.4em;
+  font-size: 0.8em;
+  font-weight: 400;
+  color: var(--ink-faint);
 }
 /* New installments slide in where the original was; the rest make room. */
 .stub-move,

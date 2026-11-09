@@ -27,6 +27,7 @@ export async function portalView(project: Project): Promise<PortalView> {
     promiseDate: promiseActive(m) ? m.promise!.date : null,
     installment: m.installment ? `${m.installment.index} of ${m.installment.count}` : null,
     replacedBy: (m.replacedBy ?? []).map(numberOf).filter(Boolean),
+    wasAmount: m.adjusted?.from ?? null,
   }))
 
   const sum = (status: PortalView['invoices'][number]['status'][]) =>
@@ -43,7 +44,12 @@ export async function portalView(project: Project): Promise<PortalView> {
     invoices,
     upcoming: project.milestones
       .filter((m) => m.status === 'planned' || m.status === 'draft')
-      .map((m) => ({ name: m.name, amount: m.amount, when: m.trigger === 'upfront' ? 'Billed soon' : 'Billed when the work is done' })),
+      .map((m) => ({
+        name: m.name,
+        amount: m.amount,
+        when: m.trigger === 'upfront' ? 'Billed soon' : 'Billed when the work is done',
+        wasAmount: m.adjusted?.from ?? null,
+      })),
     conversation,
     agentCanHelp: mandateActive(mandate),
   }

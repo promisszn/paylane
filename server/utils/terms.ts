@@ -1,11 +1,13 @@
 /**
  * Changing the payment terms of an invoice that's already with the client:
- * more time, installments, or a date the client promises to pay by.
+ * more time, installments, or a date the client promises to pay by. And, only ever on your
+ * word, the amount itself (changeAmount).
  *
- * The agent calls these from the client page when your mandate allows it, and you call them
- * when you approve a client's request. Either way the order is the same: change PayPal first,
- * then our copy (on the freshest stored version), then write the activity log.
- * None of these can change what the client owes in total.
+ * The agent calls the first three from the client page when your mandate allows it, and you
+ * call them when you approve a client's request. Either way the order is the same: change
+ * PayPal first, then our copy (on the freshest stored version), then write the activity log.
+ * The mandate never covers changeAmount: it runs from the ledger, or when you agree to a
+ * change in a reply on the client page (followThrough.ts).
  */
 import type { Clause, Milestone } from '../../types'
 
@@ -15,6 +17,8 @@ export interface By {
   actor: 'agent' | 'you'
   /** The mandate clause that allowed it, when the agent acted on its own. */
   clause?: Clause
+  /** The agent applied it because you agreed to it in a reply on the client page. */
+  via?: 'reply'
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
@@ -64,9 +68,11 @@ export async function extendDueDate(projectId: string, milestoneId: string, newD
   })
   await logActivity(
     by.actor,
-    by.actor === 'agent'
-      ? `Gave ${project.client.name} ${plural(extra, 'more day')} to pay ${m.invoiceNumber}, now due ${dayLabel(newDueDate)}. They asked on the client page. PayPal sent them the updated invoice.`
-      : `Approved ${project.client.name}'s request: ${m.invoiceNumber} is now due ${dayLabel(newDueDate)}. PayPal sent them the updated invoice.`,
+    by.via === 'reply'
+      ? `As you agreed on the client page: ${m.invoiceNumber} is now due ${dayLabel(newDueDate)}. PayPal sent ${project.client.name} the updated invoice.`
+      : by.actor === 'agent'
+        ? `Gave ${project.client.name} ${plural(extra, 'more day')} to pay ${m.invoiceNumber}, now due ${dayLabel(newDueDate)}. They asked on the client page. PayPal sent them the updated invoice.`
+        : `Approved ${project.client.name}'s request: ${m.invoiceNumber} is now due ${dayLabel(newDueDate)}. PayPal sent them the updated invoice.`,
     projectId,
     by.clause,
   )
@@ -163,9 +169,11 @@ export async function splitIntoInstallments(projectId: string, milestoneId: stri
   const schedule = installments.map((m) => `${fmt(m.amount, project.currency)} by ${dayLabel(m.dueDate!)}`).join(', ')
   await logActivity(
     by.actor,
-    by.actor === 'agent'
-      ? `Split ${original.invoiceNumber} into ${parts} payments at ${project.client.name}'s request: ${schedule}. PayPal sent invoices ${list} and cancelled the original.`
-      : `Approved ${project.client.name}'s request to pay ${original.invoiceNumber} in ${parts} parts: ${schedule}. PayPal sent invoices ${list}.`,
+    by.via === 'reply'
+      ? `As you agreed on the client page: split ${original.invoiceNumber} into ${parts} payments, ${schedule}. PayPal sent invoices ${list} and cancelled the original.`
+      : by.actor === 'agent'
+        ? `Split ${original.invoiceNumber} into ${parts} payments at ${project.client.name}'s request: ${schedule}. PayPal sent invoices ${list} and cancelled the original.`
+        : `Approved ${project.client.name}'s request to pay ${original.invoiceNumber} in ${parts} parts: ${schedule}. PayPal sent invoices ${list}.`,
     projectId,
     by.clause,
   )
@@ -176,6 +184,59 @@ export async function splitIntoInstallments(projectId: string, milestoneId: stri
     original: original.invoiceNumber!,
     installments: installments.map((m) => ({ invoiceNumber: m.invoiceNumber!, amount: m.amount, dueDate: m.dueDate! })),
   }
+}
+
+/**
+ * Change what one payment charges: a discount you agreed, a corrected price, extra work.
+ * Works before it's billed (planned), on a draft, or on an invoice the client already has, in
+ * which case PayPal emails them the updated invoice. The job's total moves by the same amount.
+ */
+export async function changeAmount(projectId: string, milestoneId: string, amount: number, by: By, note?: string) {
+  const project = await getProject(projectId)
+  const m = findMilestone(project, milestoneId)
+  if (!['planned', 'draft', 'sent'].includes(m.status)) {
+    throw createError({ statusCode: 409, statusMessage: `${m.invoiceNumber ?? m.name} is ${m.status}, so its amount can't change.` })
+  }
+  const cents = Math.round(amount * 100)
+  if (!Number.isFinite(amount) || cents < 100) {
+    throw createError({ statusCode: 400, statusMessage: `The new amount must be at least ${fmt(1, project.currency)}.` })
+  }
+  const next = cents / 100
+  if (next === m.amount) {
+    throw createError({ statusCode: 400, statusMessage: `${m.name} is already ${fmt(next, project.currency)}.` })
+  }
+  if (next > m.amount * 10) {
+    throw createError({ statusCode: 400, statusMessage: `${fmt(next, project.currency)} is more than ten times the current amount. Check it and try again.` })
+  }
+
+  const label = m.invoiceNumber ? `invoice ${m.invoiceNumber}` : m.name
+  let invoice: Awaited<ReturnType<typeof updateInvoiceAmount>> | undefined
+  if (m.invoiceId && (m.status === 'draft' || m.status === 'sent')) {
+    progress(projectId, `Changing the amount of ${label} on PayPal`)
+    invoice = await updateInvoiceAmount(m.invoiceId, next, m.status === 'sent')
+  }
+
+  const before = m.amount
+  await mutateProject(projectId, (p) => {
+    const mm = findMilestone(p, milestoneId)
+    if (invoice) applyInvoiceState(mm, invoice)
+    mm.adjusted = { from: mm.adjusted?.from ?? mm.amount, at: new Date().toISOString(), ...(note ? { note: note.slice(0, 200) } : {}) }
+    if (mm.adjusted.from === next) delete mm.adjusted
+    p.total = Math.round((p.total + next - mm.amount) * 100) / 100
+    mm.amount = next
+    // A drafted email may quote the old amount, so the agent writes it again before you send.
+    if (mm.status === 'draft' || mm.status === 'planned') {
+      delete mm.draftSubject
+      delete mm.draftNote
+    }
+  })
+  const change = `${m.name}${m.invoiceNumber ? ` (${m.invoiceNumber})` : ''} is now ${fmt(next, project.currency)}, was ${fmt(before, project.currency)}`
+  await logActivity(
+    by.actor,
+    `${by.via === 'reply' ? 'As you agreed on the client page: ' : ''}${change}${note ? ` (${note})` : ''}.${m.status === 'sent' ? ' PayPal sent the updated invoice.' : ''}`,
+    projectId,
+  )
+  return { name: m.name, invoiceNumber: m.invoiceNumber, before, amount: next, status: m.status }
 }
 
 /** Promises can pause reminders for up to two weeks. Longer needs a real new due date. */

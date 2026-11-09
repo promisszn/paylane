@@ -186,6 +186,32 @@ export async function updateInvoiceDueDate(invoiceId: string, dueDate: string, n
   )
 }
 
+/**
+ * Change what an invoice charges. Paylane invoices have one line, so its price becomes `amount`.
+ * Like the due date, this is a full read-and-PUT. The totals PayPal works out itself (amount,
+ * due_amount) are left out so it recomputes them from the new line. With `notifyClient`, PayPal
+ * emails the client the updated invoice; the pay link stays the same.
+ */
+export async function updateInvoiceAmount(invoiceId: string, amount: number, notifyClient = true) {
+  const invoice = await pp<PayPalInvoice & { items?: Array<{ unit_amount: { currency_code: string; value: string }; quantity?: string }>; due_amount?: unknown }>(
+    `/v2/invoicing/invoices/${invoiceId}`,
+  )
+  if (invoice.items?.length !== 1) {
+    throw createError({ statusCode: 409, statusMessage: 'This invoice has more than one line on PayPal, so change its amount there.' })
+  }
+  const item = invoice.items[0]!
+  item.quantity = '1'
+  item.unit_amount = { currency_code: item.unit_amount.currency_code, value: amount.toFixed(2) }
+  const body: Record<string, unknown> = { ...invoice }
+  delete body.amount
+  delete body.due_amount
+  delete body.links
+  return pp<PayPalInvoice>(
+    `/v2/invoicing/invoices/${invoiceId}?send_to_recipient=${notifyClient}&send_to_invoicer=false`,
+    { method: 'PUT', body, headers: { Prefer: 'return=representation' } },
+  )
+}
+
 /** Delete a draft that never reached the client (used to roll back a half-finished split). */
 export async function deleteDraftInvoice(invoiceId: string) {
   await pp(`/v2/invoicing/invoices/${invoiceId}`, { method: 'DELETE' })
