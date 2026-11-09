@@ -3,7 +3,7 @@
  * Sonner-style toast stack (after Emil Kowalski's Sonner):
  * - newest in front, older ones tucked behind and scaled down
  * - hover or focus fans the stack out so everything is readable
- * - swipe down (or press the toast) to dismiss
+ * - swipe up (or press the toast) to dismiss
  */
 const { toasts, dismiss } = useDashboard()
 const expanded = ref(false)
@@ -22,26 +22,26 @@ function onDown(e: PointerEvent, id: number) {
 }
 function onMove(e: PointerEvent) {
   if (!drag.id) return
-  // Only allow downward drags; resist upward ones.
+  // Only allow upward drags (toward the edge); resist downward ones.
   const dy = e.clientY - drag.startY
-  drag.dy = dy > 0 ? dy : dy * 0.15
+  drag.dy = dy < 0 ? dy : dy * 0.15
 }
 function onUp() {
   if (!drag.id) return
   const id = drag.id
-  if (drag.dy > 45) dismiss(id)
+  if (drag.dy < -45) dismiss(id)
   drag.id = 0
   drag.dy = 0
 }
 
 function style(index: number, id: number) {
   const dragging = drag.id === id
-  const y = expanded.value ? -index * (56 + GAP) : -index * PEEK
+  const y = expanded.value ? index * (56 + GAP) : index * PEEK
   const scale = expanded.value ? 1 : 1 - index * 0.05
   return {
     zIndex: String(100 - index),
     transform: `translate3d(0, ${y + (dragging ? drag.dy : 0)}px, 0) scale(${scale})`,
-    opacity: index > 2 ? '0' : dragging ? String(Math.max(0.4, 1 - drag.dy / 160)) : '1',
+    opacity: index > 2 ? '0' : dragging ? String(Math.max(0.4, 1 + drag.dy / 160)) : '1',
     transition: dragging ? 'none' : undefined,
   }
 }
@@ -83,7 +83,7 @@ function style(index: number, id: number) {
 .toasts {
   position: fixed;
   left: 50%;
-  bottom: 1.5rem;
+  top: 1.5rem;
   width: min(420px, calc(100vw - 32px));
   transform: translateX(-50%);
   z-index: 30;
@@ -92,7 +92,7 @@ function style(index: number, id: number) {
 }
 .toast {
   position: absolute;
-  inset: auto 0 0 0;
+  inset: 0 0 auto 0;
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
@@ -106,7 +106,7 @@ function style(index: number, id: number) {
   text-align: left;
   font: var(--t-sm) / 1.4 var(--font-ui);
   box-shadow: 0 10px 30px -12px rgb(22 35 63 / 0.35);
-  transform-origin: bottom center;
+  transform-origin: top center;
   touch-action: none;
   cursor: grab;
   user-select: none;
@@ -132,10 +132,10 @@ function style(index: number, id: number) {
   border-color: var(--overdue-soft);
 }
 
-/* Enter from below, exit by fading down. Exit is faster than enter. */
+/* Enter from above, exit by fading up. Exit is faster than enter. */
 .toast-enter-from {
   opacity: 0;
-  transform: translate3d(0, 24px, 0) scale(0.96) !important;
+  transform: translate3d(0, -24px, 0) scale(0.96) !important;
 }
 .toast-leave-active {
   transition:
@@ -144,7 +144,7 @@ function style(index: number, id: number) {
 }
 .toast-leave-to {
   opacity: 0;
-  transform: translate3d(0, 16px, 0) scale(0.96) !important;
+  transform: translate3d(0, -16px, 0) scale(0.96) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -32,5 +32,8 @@ export default defineEventHandler(async (event) => {
   const { message, attachment } = await readValidatedBody(event, body.parse)
   const { freelancer } = useRuntimeConfig()
   const plan = await planFromMessage(message, freelancer.currency, attachment)
+  if (!paypalSupportsCurrency(plan.currency)) {
+    throw createError({ statusCode: 422, statusMessage: unsupportedCurrencyMessage(plan.currency) })
+  }
   return { plan }
 })

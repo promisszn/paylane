@@ -29,6 +29,10 @@ const body = z.object({
  */
 export default defineEventHandler(async (event) => {
   const { plan, sourceMessage } = await readValidatedBody(event, body.parse)
+  // Checked again here so a direct API call can't save a project PayPal can never bill.
+  if (!paypalSupportsCurrency(plan.currency)) {
+    throw createError({ statusCode: 422, statusMessage: unsupportedCurrencyMessage(plan.currency) })
+  }
 
   const project: Project = {
     id: newId(),
