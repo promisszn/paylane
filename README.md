@@ -26,11 +26,12 @@ Most freelancers do this from memory and a spreadsheet. Invoices go out late, mi
 2. **You approve the plan.** It shows up as an editable receipt. Change any name, amount or due date before saving.
 3. **Drafts the invoices.** For upfront milestones, Paylane creates a **PayPal draft invoice** and the agent writes the email that goes with it.
 4. **You press Send.** Nothing reaches the client until you review the email and approve it. PayPal emails the invoice with a pay button.
-5. **Tracks every payment.** A receivables ledger (AG Grid) shows every milestone across every job: drafted, sent, overdue, split, promised or paid, updating live.
-6. **Suggests the next move.** When a deposit is paid, the agent offers to bill the next milestone. When an invoice is overdue, it writes a reminder whose tone matches how late it is and how many nudges have gone out.
-7. **Gives each client a page.** Every invoice email links to a client page: the job's invoices, a Pay with PayPal button on each, and your agent to talk to.
-8. **Negotiates for you, within a signed mandate.** On that page the client can ask for more time, to pay in parts, or say when they'll pay. If your mandate covers it, the agent changes the PayPal invoices on the spot. If not, it hands the request to you with the exact change ready, and approving is one click.
-9. **Works while you're away.** Under the mandate it sends the reminders you've allowed on its own. Firm ones always wait for you.
+5. **Tracks every payment.** A receivables ledger (AG Grid) shows every milestone across every job: drafted, sent, overdue, split, promised or paid, updating live. Search it, see totals for whatever you searched, and export exactly those rows as a CSV for your accountant.
+6. **Shows when you'll get paid.** A weekly cash-flow chart (AG Charts) stacks what's been paid, what's due and what's overdue. When the agent splits an invoice or gives a client more time, you watch the money move to its new weeks.
+7. **Suggests the next move.** When a deposit is paid, the agent offers to bill the next milestone. When an invoice is overdue, it writes a reminder whose tone matches how late it is and how many nudges have gone out.
+8. **Gives each client a page.** Every invoice email links to a client page: the job's invoices, a Pay with PayPal button on each, and your agent to talk to.
+9. **Negotiates for you, within a signed mandate.** On that page the client can ask for more time, to pay in parts, or say when they'll pay. If your mandate covers it, the agent changes the PayPal invoices on the spot. If not, it hands the request to you with the exact change ready, and approving is one click.
+10. **Works while you're away.** Under the mandate it sends the reminders you've allowed on its own. Firm ones always wait for you.
 
 ### You decide how much the agent may do: the mandate
 
@@ -251,7 +252,8 @@ components/
   PlanReceipt.vue               editable plan, approve
   NextActions.vue               agent suggestions and client requests
   MandateSlip.vue               the signed mandate
-  ReceivablesGrid.client.vue    AG Grid ledger, live cell flashes
+  ReceivablesGrid.client.vue    AG Grid ledger: search, totals rows, CSV export, live cell flashes
+  CashFlowChart.client.vue      AG Charts: when you'll get paid, week by week
   EmailReview.vue               the review-and-send checkpoint
   ConversationDialog.vue        everything said on a client page; reply in person
   ActivityLog.vue, ClientConversations.vue, StatusLine.vue, ToastStack.vue, SetupNotice.vue
@@ -262,7 +264,8 @@ types/index.ts                  shared types
 
 - **PayPal Invoicing v2 and Webhooks APIs** (sandbox): create, send, remind, update, cancel and delete invoices
 - **Google Gemini** via the Vercel AI SDK (`@ai-sdk/google`), with Claude and OpenAI as options
-- **AG Grid Community** for the receivables ledger, with live row updates and cell change flashes
+- **AG Grid Community** for the receivables ledger ([`components/ReceivablesGrid.client.vue`](components/ReceivablesGrid.client.vue)): Theming API styled to the app, custom cell renderers, a pinned actions column, quick filter search, pinned totals rows per currency that follow the search (with column spanning), CSV export of the rows shown, and live delta updates with cell change flashes
+- **AG Charts Community** for the "When you'll get paid" cash-flow chart ([`components/CashFlowChart.client.vue`](components/CashFlowChart.client.vue)): stacked weekly columns in the ledger's status colours, per-segment tooltips listing the invoices behind each amount, animated live updates
 - **Nuxt 4**, Vue 3, TypeScript, Zod
 - **Render** for hosting, with Render Key Value (Redis) for data
 

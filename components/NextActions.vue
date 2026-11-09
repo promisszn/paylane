@@ -112,7 +112,7 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
   transition: opacity var(--dur-enter) var(--ease-out);
 }
 .live-leave-active {
-  transition: opacity var(--dur-exit) ease-in;
+  transition: opacity var(--dur-exit) var(--ease-out);
 }
 .live-enter-from,
 .live-leave-to {
@@ -141,8 +141,8 @@ const keyOf = (a: NextAction) => a.kind + (a.requestId ?? a.milestoneId)
   position: absolute;
   width: 100%;
   transition:
-    opacity var(--dur-exit) ease-in,
-    transform var(--dur-exit) ease-in;
+    opacity var(--dur-exit) var(--ease-out),
+    transform var(--dur-exit) var(--ease-out);
 }
 .next-enter-from {
   opacity: 0;

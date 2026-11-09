@@ -207,8 +207,8 @@ function approve() {
 }
 .stub-leave-active {
   transition:
-    opacity var(--dur-exit) ease-in,
-    transform var(--dur-exit) ease-in;
+    opacity var(--dur-exit) var(--ease-out),
+    transform var(--dur-exit) var(--ease-out);
 }
 .stub-enter-from,
 .stub-leave-to {

@@ -159,6 +159,7 @@ export function toRows(projects: Project[]): ReceivableRow[] {
       trigger: m.trigger,
       invoiceNumber: m.invoiceNumber ?? null,
       sentAt: m.sentAt ?? null,
+      paidAt: m.status === 'paid' ? (m.paidAt ?? null) : null,
       dueDate: m.dueDate ?? null,
       daysOverdue: daysOverdue(m),
       reminders: m.reminders.length,

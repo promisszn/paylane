@@ -18,7 +18,8 @@ useHead(() => ({
 
 const money = (n: number) => formatMoney(n, view.value?.currency ?? 'USD')
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })
-const pct = (n: number) => `${view.value?.total ? Math.min(100, (n / view.value.total) * 100) : 0}%`
+/** Share of the job's total, for the meter. Drawn with scaleX so it animates on the compositor. */
+const share = (n: number) => (view.value?.total ? Math.min(1, n / view.value.total) : 0)
 const joined = (items: string[]) => (items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : (items[0] ?? ''))
 
 const open = computed(() => view.value?.invoices.filter((i) => i.status === 'unpaid' || i.status === 'overdue') ?? [])
@@ -53,8 +54,20 @@ useLive(() => `/api/portal/${token.value}/events`, {
   },
 })
 
-// The PAID stamp lands once, at the moment the payment arrives. Never on page load.
+// The PAID stamp lands once, when the payment arrives. Never on page load. Clients pay in
+// PayPal's own tab, so if this tab is in the background the stamp waits until they come back.
 const fresh = ref(new Set<string>())
+let waiting: string[] = []
+function stamp(ids: string[]) {
+  fresh.value = new Set(ids)
+  setTimeout(() => (fresh.value = new Set()), 1400)
+}
+function onVisibility() {
+  if (document.visibilityState === 'visible' && waiting.length) {
+    stamp(waiting)
+    waiting = []
+  }
+}
 watch(
   () => view.value?.invoices.map((i) => `${i.id}:${i.status}`).join('|'),
   (now, before) => {
@@ -62,14 +75,16 @@ watch(
     const was = new Map(before.split('|').map((x) => x.split(':') as [string, string]))
     const landed = view.value!.invoices.filter((i) => i.status === 'paid' && was.has(i.id) && was.get(i.id) !== 'paid').map((i) => i.id)
     if (!landed.length) return
-    fresh.value = new Set(landed)
-    setTimeout(() => (fresh.value = new Set()), 1400)
+    if (document.visibilityState === 'hidden') waiting = [...new Set([...waiting, ...landed])]
+    else stamp(landed)
   },
 )
+onMounted(() => document.addEventListener('visibilitychange', onVisibility))
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility))
 
 // --- Conversation --------------------------------------------------------------------------
 
-const list = ref<HTMLOListElement | null>(null)
+const list = ref<HTMLDivElement | null>(null)
 const message = ref('')
 const sending = ref(false)
 const pending = ref<string | null>(null)
@@ -83,15 +98,25 @@ const suggestions = computed(() => {
   if (!view.value) return []
   const out: string[] = []
   if (open.value.length) out.push('Could I have a few more days?', 'Can I pay this in two parts?', "I've already paid")
-  out.push('What does this invoice cover?')
+  out.push(open.value.length ? 'What does this invoice cover?' : 'What will I be billed for?')
   return turns.value.length > 6 ? [] : out
 })
 
-function toBottom() {
-  nextTick(() => list.value?.scrollTo({ top: list.value.scrollHeight, behavior: 'smooth' }))
+const reduceMotion = import.meta.client && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+function toBottom(smooth = false) {
+  nextTick(() => list.value?.scrollTo({ top: list.value.scrollHeight, behavior: smooth && !reduceMotion ? 'smooth' : 'auto' }))
 }
-watch(() => turns.value.length + (sending.value ? 1 : 0), toBottom)
-onMounted(toBottom)
+// Your own message jumps into view at once (it answers your keypress); replies glide in.
+watch(
+  () => turns.value.at(-1)?.id,
+  (id, prev) => {
+    if (id && id !== prev) toBottom(turns.value.at(-1)?.role !== 'client')
+  },
+)
+watch(sending, (now) => {
+  if (now) toBottom()
+})
+onMounted(() => toBottom())
 
 async function send(text?: string) {
   const body = (text ?? message.value).trim()
@@ -110,7 +135,6 @@ async function send(text?: string) {
     sending.value = false
     pending.value = null
     progress.value = null
-    toBottom()
   }
 }
 
@@ -148,8 +172,8 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
           </div>
 
           <div class="meter" role="img" :aria-label="`${money(view.paid)} paid of ${money(view.total)}`">
-            <span class="meter__paid" :style="{ width: pct(view.paid) }" />
-            <span class="meter__due" :style="{ width: pct(view.due) }" />
+            <span class="meter__fill meter__fill--due" :style="{ transform: `scaleX(${share(view.paid + view.due)})` }" />
+            <span class="meter__fill meter__fill--paid" :style="{ transform: `scaleX(${share(view.paid)})` }" />
           </div>
           <p class="meter__legend">
             <span><span class="meter__key meter__key--paid" />{{ money(view.paid) }} paid</span>
@@ -205,8 +229,9 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
             </p>
           </header>
 
-          <ol ref="list" class="chat" aria-live="polite">
-            <li v-if="!turns.length" class="msg" data-role="agent">
+          <div ref="list" class="chat">
+          <TransitionGroup tag="ol" name="msg" class="chat__list" aria-live="polite">
+            <li key="hello" class="msg" data-role="agent">
               <p class="msg__who">Assistant</p>
               <p class="msg__text">Hi {{ view.client }}, I'm {{ first }}'s billing assistant. Ask me anything about these invoices.</p>
             </li>
@@ -217,11 +242,11 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
                 <li v-for="(a, i) in t.actions" :key="i" class="receipt-line" :data-kind="a.kind">{{ a.text }}</li>
               </ul>
             </li>
-            <li v-if="showPending" class="msg" data-role="client">
+            <li v-if="showPending" key="pending" class="msg" data-role="client">
               <p class="msg__who">You</p>
               <p class="msg__text">{{ pending }}</p>
             </li>
-            <li v-if="sending" class="msg msg--working" data-role="agent">
+            <li v-if="sending" key="working" class="msg msg--working" data-role="agent">
               <p class="msg__who">Assistant</p>
               <p class="msg__text">
                 <span class="dots" aria-hidden="true"><span /><span /><span /></span>
@@ -230,10 +255,11 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
                 </Transition>
               </p>
             </li>
-          </ol>
+          </TransitionGroup>
+          </div>
 
-          <div v-if="!sending && suggestions.length" class="chips">
-            <button v-for="s in suggestions" :key="s" type="button" class="chip" @click="send(s)">{{ s }}</button>
+          <div v-if="suggestions.length" class="chips">
+            <button v-for="s in suggestions" :key="s" type="button" class="chip" :disabled="sending" @click="send(s)">{{ s }}</button>
           </div>
 
           <form class="composer" @submit.prevent="send()">
@@ -358,23 +384,24 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   color: var(--ink-soft);
 }
 .meter {
+  position: relative;
   margin-top: 1.1rem;
-  display: flex;
   height: 6px;
   border-radius: 99px;
   overflow: hidden;
   background: var(--rule-soft);
 }
-.meter__paid,
-.meter__due {
-  display: block;
-  height: 100%;
-  transition: width 600ms var(--ease-out);
+/* Two layers from the left edge: due (paid + due) underneath, paid on top. */
+.meter__fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transition: transform 400ms var(--ease-out);
 }
-.meter__paid {
+.meter__fill--paid {
   background: var(--paid);
 }
-.meter__due {
+.meter__fill--due {
   background: var(--carbon);
   opacity: 0.55;
 }
@@ -544,15 +571,28 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   color: var(--ink-soft);
 }
 .chat {
+  flex: 1 1 auto;
+  min-height: 12rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.chat__list {
   list-style: none;
   margin: 0;
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
-  min-height: 12rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+}
+/* Replies and the working bubble rise in; your own message appears at once (it's your keypress). */
+.msg-enter-active:not([data-role='client']) {
+  transition:
+    opacity var(--dur-enter) var(--ease-out),
+    transform var(--dur-enter) var(--ease-out);
+}
+.msg-enter-from:not([data-role='client']) {
+  opacity: 0;
+  transform: translateY(6px);
 }
 .msg {
   max-width: 86%;
@@ -632,14 +672,19 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   }
 }
 .swap-enter-active {
-  transition: opacity var(--dur-enter) var(--ease-out);
+  transition:
+    opacity var(--dur-enter) var(--ease-out),
+    filter var(--dur-enter) var(--ease-out);
 }
 .swap-leave-active {
-  transition: opacity var(--dur-exit) ease-in;
+  transition:
+    opacity var(--dur-exit) var(--ease-out),
+    filter var(--dur-exit) var(--ease-out);
 }
 .swap-enter-from,
 .swap-leave-to {
   opacity: 0;
+  filter: blur(2px);
 }
 .chips {
   display: flex;
@@ -660,11 +705,15 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
     border-color var(--dur-press) var(--ease-out),
     color var(--dur-press) var(--ease-out);
 }
-.chip:active {
+.chip:active:not(:disabled) {
   transform: scale(0.97);
 }
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 @media (hover: hover) and (pointer: fine) {
-  .chip:hover {
+  .chip:hover:not(:disabled) {
     border-color: var(--carbon);
     color: var(--carbon);
   }
@@ -730,6 +779,9 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .msg-enter-from:not([data-role='client']) {
+    transform: none;
+  }
   .stamp--fresh {
     animation: stamp-fade 200ms linear both;
   }
@@ -742,8 +794,7 @@ onBeforeUnmount(() => clearTimeout(progressTimer))
     animation: none;
     opacity: 0.6;
   }
-  .meter__paid,
-  .meter__due {
+  .meter__fill {
     transition: none;
   }
 }

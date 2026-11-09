@@ -64,11 +64,17 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <ClientOnly>
+        <CashFlowChart />
+      </ClientOnly>
+
       <section class="ledger" aria-labelledby="ledger-heading">
-        <h2 id="ledger-heading" class="ledger__title">Receivables</h2>
         <ClientOnly>
           <ReceivablesGrid />
-          <template #fallback><p class="ledger__loading">Loading the ledger…</p></template>
+          <template #fallback>
+            <h2 id="ledger-heading" class="ledger__title">Receivables</h2>
+            <p class="ledger__loading">Loading the ledger…</p>
+          </template>
         </ClientOnly>
       </section>
 

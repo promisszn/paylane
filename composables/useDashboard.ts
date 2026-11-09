@@ -69,6 +69,51 @@ export function errorText(err: any) {
 export const formatMoney = (amount: number, currency: string) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)
 
+// ---------------------------------------------------------------------------
+// Toast timers pause while the tab is hidden or the stack is hovered, as in Sonner. A payment or
+// an agent action announced while you're on a client page's tab is still there when you return.
+// ---------------------------------------------------------------------------
+
+interface ToastTimer {
+  left: number
+  since: number
+  handle?: ReturnType<typeof setTimeout>
+  fire: () => void
+}
+const toastTimers = new Map<number, ToastTimer>()
+const pauseReasons = new Set<string>()
+
+function runToastTimer(id: number) {
+  const t = toastTimers.get(id)
+  if (!t || pauseReasons.size) return
+  t.since = Date.now()
+  t.handle = setTimeout(() => {
+    toastTimers.delete(id)
+    t.fire()
+  }, t.left)
+}
+
+export function pauseToasts(reason: 'hover' | 'hidden') {
+  if (pauseReasons.has(reason)) return
+  pauseReasons.add(reason)
+  if (pauseReasons.size > 1) return
+  for (const t of toastTimers.values()) {
+    clearTimeout(t.handle)
+    // Leave enough time to read it once you're back.
+    t.left = Math.max(1500, t.left - (Date.now() - t.since))
+  }
+}
+
+export function resumeToasts(reason: 'hover' | 'hidden') {
+  if (!pauseReasons.delete(reason) || pauseReasons.size) return
+  for (const id of toastTimers.keys()) runToastTimer(id)
+}
+
+if (import.meta.client) {
+  document.addEventListener('visibilitychange', () => (document.hidden ? pauseToasts('hidden') : resumeToasts('hidden')))
+  if (document.hidden) pauseToasts('hidden')
+}
+
 /** Shared app state and the calls that change it. */
 export function useDashboard() {
   const data = useState<DashboardData | null>('dashboard', () => null)
@@ -88,13 +133,18 @@ export function useDashboard() {
 
   function dismiss(id: number) {
     toasts.value = toasts.value.filter((t) => t.id !== id)
+    clearTimeout(toastTimers.get(id)?.handle)
+    toastTimers.delete(id)
   }
 
-  /** Sonner-style: newest on top, max 3 visible, errors stay a little longer. */
+  /** Sonner-style: newest on top, max 3 visible, errors and agent news stay a little longer. */
   function notify(text: string, tone: Toast['tone'] = 'ok') {
     const id = Date.now() + Math.random()
-    toasts.value = [{ id, text, tone }, ...toasts.value].slice(0, 3)
-    setTimeout(() => dismiss(id), tone === 'error' ? 7000 : tone === 'agent' ? 6500 : 4500)
+    const next = [{ id, text, tone }, ...toasts.value]
+    for (const dropped of next.slice(3)) dismiss(dropped.id)
+    toasts.value = next.slice(0, 3)
+    toastTimers.set(id, { left: tone === 'error' ? 7000 : tone === 'agent' ? 6500 : 4500, since: Date.now(), fire: () => dismiss(id) })
+    runToastTimer(id)
   }
 
   /**

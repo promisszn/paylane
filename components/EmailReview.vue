@@ -92,8 +92,8 @@ const toneDescription: Record<NonNullable<PendingEmail['tone']>, string> = {
   opacity: 0;
   transform: scale(0.96);
   transition:
-    opacity var(--dur-exit) ease-in,
-    transform var(--dur-exit) ease-in,
+    opacity var(--dur-exit) var(--ease-out),
+    transform var(--dur-exit) var(--ease-out),
     overlay var(--dur-exit) allow-discrete,
     display var(--dur-exit) allow-discrete;
 }

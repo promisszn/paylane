@@ -8,7 +8,7 @@ import type { OpenConversation } from '~/composables/useDashboard'
  */
 const { conversation, status, busy, sendReply } = useDashboard()
 const dialog = ref<HTMLDialogElement | null>(null)
-const list = ref<HTMLOListElement | null>(null)
+const list = ref<HTMLDivElement | null>(null)
 const reply = ref('')
 // Keep the last conversation rendered while the dialog animates out.
 const shown = ref<OpenConversation | null>(null)
@@ -60,7 +60,8 @@ async function send() {
       </header>
 
       <p v-if="!shown.turns.length" class="convo__empty">{{ shown.client }} hasn't written on their page yet.</p>
-      <ol v-else ref="list" class="convo__turns">
+      <div v-else ref="list" class="convo__scroll">
+      <TransitionGroup tag="ol" name="turn" class="convo__turns">
         <li v-for="t in shown.turns" :key="t.id" class="turn" :data-role="t.role">
           <p class="turn__who">
             {{ who(t.role) }}
@@ -71,12 +72,21 @@ async function send() {
             <li v-for="(a, i) in t.actions" :key="i" class="receipt-line" :data-kind="a.kind">{{ a.text }}</li>
           </ul>
         </li>
-      </ol>
+      </TransitionGroup>
+      </div>
 
       <form class="convo__reply" @submit.prevent="send">
         <label class="field">
           <span class="field__label">Reply as {{ first }}. It shows on {{ shown.client }}'s page straight away.</span>
-          <textarea v-model="reply" class="textarea" rows="3" maxlength="1500" @keydown.meta.enter="send" @keydown.ctrl.enter="send" />
+          <textarea
+            v-model="reply"
+            class="textarea"
+            rows="3"
+            maxlength="1500"
+            :autofocus="Boolean(shown.requestId)"
+            @keydown.meta.enter="send"
+            @keydown.ctrl.enter="send"
+          />
         </label>
         <footer class="convo__actions">
           <button type="button" class="btn btn--quiet" @click="conversation = null">Close</button>
@@ -103,8 +113,8 @@ async function send() {
   opacity: 0;
   transform: scale(0.96);
   transition:
-    opacity var(--dur-exit) ease-in,
-    transform var(--dur-exit) ease-in,
+    opacity var(--dur-exit) var(--ease-out),
+    transform var(--dur-exit) var(--ease-out),
     overlay var(--dur-exit) allow-discrete,
     display var(--dur-exit) allow-discrete;
 }
@@ -167,15 +177,32 @@ async function send() {
 .convo__empty {
   color: var(--ink-soft);
 }
+.convo__scroll {
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .convo__turns {
   list-style: none;
   margin: 0;
   padding: 0 0.25rem 0 0;
   display: grid;
   gap: 0.75rem;
-  max-height: 46vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+}
+/* What arrives live (the client, the agent) rises in; your own reply appears at once. */
+.turn-enter-active:not([data-role='freelancer']) {
+  transition:
+    opacity var(--dur-enter) var(--ease-out),
+    transform var(--dur-enter) var(--ease-out);
+}
+.turn-enter-from:not([data-role='freelancer']) {
+  opacity: 0;
+  transform: translateY(6px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .turn-enter-from:not([data-role='freelancer']) {
+    transform: none;
+  }
 }
 .turn {
   max-width: 88%;

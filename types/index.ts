@@ -209,6 +209,8 @@ export interface ReceivableRow {
   trigger: MilestoneTrigger
   invoiceNumber: string | null
   sentAt: string | null
+  /** When PayPal reported it paid. */
+  paidAt: string | null
   dueDate: string | null
   daysOverdue: number
   reminders: number

@@ -8,6 +8,13 @@
 const { toasts, dismiss } = useDashboard()
 const expanded = ref(false)
 
+/** Fan the stack out and stop the clocks while you're reading it. */
+function hold(on: boolean) {
+  expanded.value = on
+  if (on) pauseToasts('hover')
+  else resumeToasts('hover')
+}
+
 const GAP = 10
 const PEEK = 12
 
@@ -52,10 +59,10 @@ function style(index: number, id: number) {
     class="toasts"
     aria-live="polite"
     aria-label="Notifications"
-    @mouseenter="expanded = true"
-    @mouseleave="expanded = false"
-    @focusin="expanded = true"
-    @focusout="expanded = false"
+    @mouseenter="hold(true)"
+    @mouseleave="hold(false)"
+    @focusin="hold(true)"
+    @focusout="hold(false)"
   >
     <TransitionGroup name="toast">
       <button
@@ -146,8 +153,8 @@ function style(index: number, id: number) {
 }
 .toast-leave-active {
   transition:
-    transform var(--dur-exit) ease-in,
-    opacity var(--dur-exit) ease-in !important;
+    transform var(--dur-exit) var(--ease-out),
+    opacity var(--dur-exit) var(--ease-out) !important;
 }
 .toast-leave-to {
   opacity: 0;
