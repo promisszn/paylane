@@ -111,6 +111,8 @@ function onClick(e: MouseEvent) {
 }
 .panel__close {
   position: absolute;
+  /* Above the mandate, which comes later in the page and would otherwise catch its clicks. */
+  z-index: 1;
   top: 1.1rem;
   right: 1.1rem;
   display: grid;
