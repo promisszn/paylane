@@ -104,7 +104,7 @@ function busyKeyFor(action: string, r: ReceivableRow) {
   if (action === 'done') return `complete:${r.milestoneId}`
   if (action === 'remind') return `reminder-draft:${r.milestoneId}`
   if (action === 'cancel') return `cancel:${r.milestoneId}`
-  if (action === 'overdue') return 'demo'
+  if (action === 'overdue') return `demo:${r.milestoneId}`
   return null
 }
 const isLoading = (action: string, r: ReceivableRow) => busy.value !== null && busy.value === busyKeyFor(action, r)

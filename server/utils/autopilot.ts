@@ -58,6 +58,15 @@ async function pass() {
   return sent
 }
 
+/**
+ * A pass that is sure to see a change made just now. A pass already running may have read the
+ * jobs before that change, so wait it out first, then run (or join) a fresh one.
+ */
+export async function runAutopilotNow(): Promise<number> {
+  if (running) await running.catch(() => 0)
+  return runAutopilot()
+}
+
 /** Fire and forget: the open pages update over the live connection when it's done. */
 export function kickAutopilot() {
   void runAutopilot().catch((err) => console.error('[paylane] autopilot failed', err))

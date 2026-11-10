@@ -159,10 +159,12 @@ export function useDashboard() {
   }
 
   /**
-   * Re-fetch everything. With `announce`, also tell the user about what changed without them:
-   * payments that landed and things the agent did on its own or was asked by a client.
+   * Re-fetch everything, and tell the user about what changed without them: payments that
+   * landed and things the agent did on its own or was asked by a client. On by default, so a
+   * refresh after one of your own clicks never swallows something the agent did meanwhile.
+   * Each thing is announced once (see `announced`).
    */
-  async function refresh(announce = false) {
+  async function refresh(announce = true) {
     const before = data.value
     const next = await $fetch<DashboardData>('/api/dashboard')
     data.value = next
@@ -309,12 +311,14 @@ export function useDashboard() {
    */
   async function makeOverdue(projectId: string, milestoneId: string, currentDaysOverdue: number) {
     const days = currentDaysOverdue < 2 ? 2 : currentDaysOverdue < 10 ? 10 : currentDaysOverdue < 20 ? 20 : currentDaysOverdue + 10
-    const res = await run('demo', () =>
+    // The server waits for the agent's reminder pass, so this resolves after any reminder it sent.
+    const res = await run(`demo:${milestoneId}`, () =>
       $fetch<{ milestone: { invoiceNumber?: string } }>('/api/demo/overdue', { method: 'POST', body: { projectId, milestoneId, days } }),
     )
     if (!res) return
-    await refresh()
     notify(`Demo: ${res.milestone.invoiceNumber ?? 'Invoice'} is now ${days} days overdue.`)
+    // Announces the reminder the agent sent on its own, if it sent one (newest toast on top).
+    await refresh()
   }
 
   async function syncPayPal() {

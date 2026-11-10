@@ -219,7 +219,10 @@ export function nextActions(projects: Project[], requests: ClientRequest[] = [],
       if (reminderDue(m, now)) {
         const late = daysOverdue(m, now)
         const tone = reminderTone(late, m.reminders.length)
-        if (mandate && mayRemind(mandate, p, m, tone).ok && !m.autoRemindError) continue
+        const verdict = mandate ? mayRemind(mandate, p, m, tone) : null
+        if (verdict?.ok && !m.autoRemindError) continue
+        // Say why this one waits for you, so it's clear the agent held back on purpose.
+        const why = mandate?.signedAt && verdict && !verdict.ok ? ` ${verdict.reason}` : ''
         actions.push({
           kind: 'remind',
           projectId: p.id,
@@ -227,7 +230,7 @@ export function nextActions(projects: Project[], requests: ClientRequest[] = [],
           title: `Remind ${p.client.name} about ${m.invoiceNumber}`,
           detail: m.autoRemindError
             ? `The agent couldn't send this on its own: ${m.autoRemindError}`
-            : `${fmt(m.amount, p.currency)} is ${late} day${late === 1 ? '' : 's'} overdue${m.reminders.length ? `, ${m.reminders.length} reminder${m.reminders.length === 1 ? '' : 's'} sent` : ''}.`,
+            : `${fmt(m.amount, p.currency)} is ${late} day${late === 1 ? '' : 's'} overdue${m.reminders.length ? `, ${m.reminders.length} reminder${m.reminders.length === 1 ? '' : 's'} sent` : ''}.${why}`,
           tone,
         })
       }

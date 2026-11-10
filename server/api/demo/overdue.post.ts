@@ -29,7 +29,14 @@ export default defineEventHandler(async (event) => {
     return m
   })
   await logActivity('you', `Demo mode: moved ${milestone.invoiceNumber} forward in time, so it's ${input.days} day${input.days === 1 ? '' : 's'} overdue.`, project.id)
-  // If the mandate covers a reminder now, the agent sends it on its own; pages update live.
-  kickAutopilot()
-  return { milestone: updated, daysOverdue: daysOverdue(updated) }
+  // If the mandate covers a reminder now, the agent sends it on its own. Wait for that here
+  // (the button shows a spinner), so the dashboard can announce it the moment this returns
+  // instead of depending on the live connection.
+  let remindersSent = 0
+  try {
+    remindersSent = await runAutopilotNow()
+  } catch (err) {
+    console.error('[paylane] autopilot after backdate failed', err)
+  }
+  return { milestone: updated, daysOverdue: daysOverdue(updated), remindersSent }
 })

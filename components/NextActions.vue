@@ -25,8 +25,11 @@ function act(a: NextAction) {
   if (a.kind === 'invoice_next') return reviewInvoice(a.projectId, a.milestoneId, true)
 }
 
+/** Busy with this suggestion's own action. Backdating the same invoice in the ledger doesn't count. */
 const isBusy = (a: NextAction) =>
-  a.requestId ? busy.value === `request:${a.requestId}` : (busy.value?.endsWith(a.milestoneId) ?? false)
+  a.requestId
+    ? busy.value === `request:${a.requestId}`
+    : Boolean(busy.value?.endsWith(a.milestoneId) && !busy.value.startsWith('demo:'))
 /** Approve and Decline share one busy key, so remember which of the two you pressed. */
 const pressed = ref<'approve' | 'decline' | 'handled' | null>(null)
 function decide(a: NextAction, decision: 'approve' | 'decline' | 'handled') {
