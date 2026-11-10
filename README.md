@@ -6,7 +6,7 @@
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) on the PayPal sandbox.
 
-> Demo video: _add YouTube link_
+> Demo video: https://youtu.be/3uwcp8FziwU
 >
 > Live demo: **[paylane.onrender.com](https://paylane.onrender.com)** (PayPal sandbox. Pay invoices with any [sandbox personal account](https://developer.paypal.com/dashboard/accounts). The first load can take up to a minute if the app has been idle.)
 
@@ -34,7 +34,7 @@ Most freelancers do this from memory and a spreadsheet. Invoices go out late, mi
 | --- | --- |
 | ![The dashboard: what you're owed, what's overdue, a client request waiting for approval and a drafted invoice ready to send](docs/screenshots/1-dashboard.png) | ![The client page: the client's invoices with a Pay with PayPal button on each, beside a chat where the agent split an invoice and applied a discount](docs/screenshots/2-client-page.png) |
 
-1. **Reads the deal.** Paste a client message. The agent extracts the client, total, currency and a milestone plan (deposit, phases, final payment), and flags anything it couldn't work out, like a missing email.
+1. **Reads the deal.** Paste a client message, or drop in a screenshot of the chat or a PDF of the scope. The agent extracts the client, total, currency and a milestone plan (deposit, phases, final payment), and flags anything it couldn't work out, like a missing email.
 2. **You approve the plan.** It shows up as an editable receipt. Change any name, amount or due date before saving.
 3. **Drafts the invoices.** For upfront milestones, Paylane creates a **PayPal draft invoice** and the agent writes the email that goes with it.
 4. **You press Send.** Nothing reaches the client until you review the email and approve it. PayPal emails the invoice with a pay button.
@@ -93,7 +93,7 @@ All calls go to the PayPal REST APIs in [`server/utils/paypal.ts`](server/utils/
 | `DELETE /v2/invoicing/invoices/{id}` | Roll back unsent drafts if a split fails halfway, so a client never sees half a split |
 | `GET /v2/invoicing/invoices/{id}` | Read status and the client's pay link; the agent's "I've already paid" check |
 | `POST /v1/notifications/verify-webhook-signature` | Verify every incoming webhook before trusting it |
-| Webhook `INVOICING.INVOICE.PAID` | On a deployed instance, mark a milestone paid the moment the client pays. Locally, **Check for payments** does the same by asking PayPal (see [Webhooks](#webhooks-optional)) |
+| Webhooks `INVOICING.INVOICE.PAID`, `CANCELLED` and `UPDATED` | On a deployed instance, mark a milestone paid the moment the client pays, and pick up changes made on PayPal. Locally, **Check for payments** does the same by asking PayPal (see [Webhooks](#webhooks-optional)) |
 
 ## How AI is used
 
@@ -101,7 +101,7 @@ The agent lives in [`server/utils/ai.ts`](server/utils/ai.ts). It uses **Google 
 
 | Job | Input | Output |
 | --- | --- | --- |
-| Plan the deal | Raw client message | Client, currency, total, milestones, open questions |
+| Plan the deal | A client message, chat screenshot or PDF | Client, currency, total, milestones, open questions |
 | Write the invoice email | Project and milestone | Subject and a short, human note |
 | Write a reminder | Days overdue, reminders already sent, a broken payment promise | Subject and note, tone scaled from friendly to firm |
 | Talk to your client on their page | The job's invoices, the conversation, five tools | A reply, plus receipts for what it changed on PayPal |
@@ -228,7 +228,7 @@ Good to know: the free web service sleeps after about 15 minutes without visitor
 | The PayPal pay page shows an error, and its URL contains `code=UEFZRUVfQUNDT1VOVF9MT0NLRURfT1JfQ0xPU0VE` (`PAYEE_ACCOUNT_LOCKED_OR_CLOSED`) | The business account can't receive payments, often because of its country | Create a **US** business sandbox account, make a new app on it (step 1), and use that app's keys. |
 | The page says an AI key is missing | `AI_PROVIDER` doesn't match the key you filled in | Set `AI_PROVIDER=google` with `GOOGLE_GENERATIVE_AI_API_KEY`, or switch both to Anthropic or OpenAI. |
 | A change to `.env` doesn't take effect | The dev server is still using the old values | Stop `npm run dev` and start it again. |
-| The topbar says **Offline** instead of **Live** | Something between the browser and the app blocks event streams | Pages fall back to checking every 30 seconds. Behind a proxy, allow `text/event-stream` responses on `/api/events`. |
+| The topbar says **Offline** instead of **Live** | Something between the browser and the app blocks event streams | The dashboard falls back to checking every 30 seconds. Behind a proxy, allow `text/event-stream` responses on `/api/events`. |
 | The client page agent says it can only pass things on | The mandate isn't signed, or the invoice is over the limit or in another currency | Sign the mandate (**Mandate** in the top bar), or approve the request yourself. |
 | You agreed to a change in a reply but nothing changed | The reply was conditional or tentative, the **Apply any change I agree to** tick was off, or PayPal refused | Use **Change** on the row in the ledger. If PayPal refused, the reason is in the activity log. |
 
@@ -250,6 +250,7 @@ server/
     portal/[token]/             the client page: view, chat with the agent, live updates
     events.get.ts               live updates for the dashboard (server-sent events)
     sync.post.ts                pull invoice status from PayPal
+    status.get.ts               setup check (which keys are set, which storage is in use); Render's health check
     webhooks/paypal.post.ts     verified PayPal webhooks
     demo/overdue.post.ts        demo mode: move a sent invoice forward in time (sandbox only)
     demo/reset.post.ts          demo mode: clear projects and activity (needs DEMO_RESET_TOKEN)
@@ -273,7 +274,7 @@ pages/
   index.vue                     your dashboard
   pay/[token].vue               the client page every invoice email links to
 components/
-  JobIntake.vue                 paste a client message
+  JobIntake.vue                 paste a client message, screenshot or PDF
   PlanReceipt.vue               editable plan, approve
   NextActions.vue               agent suggestions and client requests
   MandatePanel.vue              side panel holding the mandate, opened from the top bar
@@ -284,6 +285,10 @@ components/
   EmailReview.vue               the review-and-send checkpoint
   ConversationDialog.vue        everything said on a client page; reply in person
   ActivityLog.vue, ClientConversations.vue, StatusLine.vue, ToastStack.vue, SetupNotice.vue
+composables/
+  useDashboard.ts               dashboard state and actions
+  useLive.ts                    live updates over server-sent events; reconnects on its own after a drop
+shared/utils/currencies.ts      currencies PayPal invoices accept
 types/index.ts                  shared types
 ```
 
