@@ -223,7 +223,7 @@ onBeforeUnmount(() => {
   background: var(--paid);
 }
 .main {
-  max-width: 1240px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 2.5rem) 4rem;
   display: grid;

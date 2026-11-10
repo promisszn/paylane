@@ -1,5 +1,7 @@
 # Paylane
 
+![Paylane: the AI agent that gets freelancers paid. The client page chat shows the agent splitting an invoice, then applying a $100 discount the freelancer agreed to.](docs/screenshots/0-thumbnail.png)
+
 **An AI payments agent for freelancers. Paste what a client sent you, and Paylane turns it into PayPal invoices, sends them when you say so, and chases late payments in the right tone. Sign it a mandate, and the agent also negotiates with your clients on your behalf: more time, installments, payment promises, changed on the real PayPal invoices, never beyond the limits you signed. And when you agree to something yourself, like "$100 off the last payment", the agent makes that change on PayPal too.**
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) on the PayPal sandbox.
@@ -10,17 +12,27 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) on t
 
 ---
 
+## Why I built it
+
+I once closed a deal with a client where we agreed on how the payment would be sent, but never on a date. I said yes and waited, because I wasn't going to start the work until the first payment came in. I wanted to follow up, but every message I drafted sounded desperate, and I didn't want to risk the relationship before the work had even started. So I said nothing, and the project sat on hold.
+
+The problem wasn't the client. Nothing in our deal ever became concrete: no invoice, no due date, nobody whose job it was to send a polite nudge. Every follow-up had to come from me, and every one felt personal.
+
 ## The problem
 
-Freelancers lose real money to admin. A deal gets agreed in a chat ("$800, half upfront, rest when it's live"), and then someone has to:
+That story is common. A deal gets agreed in a chat ("$800, half upfront, rest when it's live"), and then someone has to:
 
 - turn that sentence into invoices with the right amounts and due dates
 - remember to bill the next milestone when the work is done
 - notice when a payment is late and write a reminder that is firm without souring the relationship
 
-Most freelancers do this from memory and a spreadsheet. Invoices go out late, milestones get forgotten, and awkward follow-ups get put off for weeks.
+Most freelancers do this from memory and a spreadsheet. Invoices go out late, milestones get forgotten, and awkward follow-ups get put off for weeks. Paylane turns the deal into real PayPal invoices with real due dates, and does the follow-up for you, so asking to be paid stops feeling like begging.
 
 ## What Paylane does
+
+| Your dashboard | Your client's page |
+| --- | --- |
+| ![The dashboard: what you're owed, what's overdue, a client request waiting for approval and a drafted invoice ready to send](docs/screenshots/1-dashboard.png) | ![The client page: the client's invoices with a Pay with PayPal button on each, beside a chat where the agent split an invoice and applied a discount](docs/screenshots/2-client-page.png) |
 
 1. **Reads the deal.** Paste a client message. The agent extracts the client, total, currency and a milestone plan (deposit, phases, final payment), and flags anything it couldn't work out, like a missing email.
 2. **You approve the plan.** It shows up as an editable receipt. Change any name, amount or due date before saving.
@@ -38,6 +50,8 @@ Most freelancers do this from memory and a spreadsheet. Invoices go out late, mi
 ### You decide how much the agent may do: the mandate
 
 Most agents force a choice between asking about everything (it doesn't scale) and doing anything (you can't trust it with money). Paylane uses a **mandate**: a short slip you sign, like a spending limit on a company card, but for what the agent may agree to with your clients.
+
+![The mandate panel: four clauses the freelancer signs, and the line the agent never crosses on a client's word](docs/screenshots/3-mandate.png)
 
 | Clause | The agent may, on its own | Example |
 | --- | --- | --- |

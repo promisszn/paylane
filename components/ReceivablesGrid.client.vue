@@ -203,25 +203,25 @@ function totalBreakdown(r: LedgerRow) {
 // --- Columns ----------------------------------------------------------------------------------
 
 const columnDefs: ColDef<LedgerRow>[] = [
-  // Client names are short, job names are the longest text, so Job gets the most room.
+  // Client, Job and Milestone share what the fixed columns leave, with room for a full client name.
   // Fixed columns are sized to their content so the whole grid fits 1160px even in demo mode
-  // (flex minimums 70 + 110 + 110 plus fixed widths 851 = 1141), with every header readable.
+  // (flex minimums 90 + 110 + 106 plus fixed widths 854 = 1160), with every header readable.
   {
     field: 'client',
     headerName: 'Client',
-    minWidth: 70,
-    flex: 0.7,
+    minWidth: 90,
+    flex: 1,
     tooltipField: 'client',
     // On the totals row, the label spans Client, Job and Milestone.
     colSpan: (p) => (isTotal(p) ? 3 : 1),
     cellRendererSelector: (p) => (isTotal(p) ? { component: totalLabel } : undefined),
   },
-  { field: 'project', headerName: 'Job', minWidth: 110, flex: 1.4, tooltipField: 'project' },
-  { field: 'milestone', headerName: 'Milestone', minWidth: 110, flex: 1.5, tooltipField: 'milestone' },
+  { field: 'project', headerName: 'Job', minWidth: 110, flex: 1.2, tooltipField: 'project' },
+  { field: 'milestone', headerName: 'Milestone', minWidth: 106, flex: 1.4, tooltipField: 'milestone' },
   {
     field: 'amount',
     headerName: 'Amount',
-    width: 105,
+    width: 100,
     type: 'rightAligned',
     cellClass: 'money',
     valueFormatter: (p) => (p.data ? formatMoney(p.value, p.data.currency) : ''),
@@ -246,11 +246,11 @@ const columnDefs: ColDef<LedgerRow>[] = [
     },
     comparator: (_a, _b, na, nb) => (na.data?.daysOverdue ?? 0) - (nb.data?.daysOverdue ?? 0),
   },
-  { field: 'invoiceNumber', headerName: 'Invoice', width: 84, valueFormatter: (p) => p.value ?? '' },
+  { field: 'invoiceNumber', headerName: 'Invoice', width: 80, valueFormatter: (p) => p.value ?? '' },
   {
     field: 'dueDate',
     headerName: 'Due',
-    width: 100,
+    width: 92,
     enableCellChangeFlash: true,
     // "+6" marks extra days the client was given after the invoice went out.
     valueGetter: (p) => (p.data?.dueDate ? `${dayMonth(p.data.dueDate)}${p.data.extendedDays ? ` +${p.data.extendedDays}d` : ''}` : ''),
@@ -262,7 +262,8 @@ const columnDefs: ColDef<LedgerRow>[] = [
     colId: 'actions',
     headerName: '',
     // Room for the extra demo button. Status is loaded before this client-only grid mounts.
-    width: demo.value ? 350 : 270,
+    // Measured: Remind, Change and Client page need 274px with the cell padding; Backdate adds 86.
+    width: demo.value ? 370 : 286,
     pinned: 'right',
     sortable: false,
     getQuickFilterText: () => '',
